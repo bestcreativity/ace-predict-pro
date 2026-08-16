@@ -64,7 +64,7 @@ function Index() {
   }, [refreshSlots]);
 
   return (
-    <div className="shell-bg min-h-screen pb-20">
+    <div className="shell-bg min-h-screen pb-56">
       <header className="mx-auto max-w-2xl px-4 pt-8">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-gradient-gold font-display text-3xl font-bold tracking-tight">
