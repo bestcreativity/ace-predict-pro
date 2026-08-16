@@ -99,7 +99,8 @@ function AdminPage() {
         odds: String(form.get("odds")),
         tip: String(form.get("tip")),
         confidence: Number(form.get("confidence")) || 80,
-        adUrl: String(form.get("adUrl")),
+        adZoneId: String(form.get("adZoneId") ?? "").trim(),
+        adUrl: String(form.get("adUrl") ?? "").trim(),
         ...(slip ? { slipImage: slip } : {}),
       },
       `Prediction ${selectedSlot} published`,
@@ -118,6 +119,7 @@ function AdminPage() {
         odds: "",
         tip: "",
         confidence: 80,
+        adZoneId: "",
         adUrl: "",
       },
       `Prediction ${selectedSlot} changed to Coming Soon`,
@@ -201,13 +203,34 @@ function AdminPage() {
               min="1"
               max="100"
             />
-            <Field
-              name="adUrl"
-              label="Direct Ad Link"
-              defaultValue={selected.adUrl}
-              placeholder="https://example.com/your-ad"
-              type="url"
-            />
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <div>
+              <h3 className="text-sm font-semibold">Ad Unlock</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A Zone ID plays a real rewarded video inside the app. A direct link only opens a
+                webpage, so it is used as a fallback when the video cannot load.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                name="adZoneId"
+                label="Monetag Rewarded Zone ID"
+                defaultValue={selected.adZoneId}
+                placeholder="9876543"
+                inputMode="numeric"
+                required={false}
+              />
+              <Field
+                name="adUrl"
+                label="Direct Ad Link (fallback)"
+                defaultValue={selected.adUrl}
+                placeholder="https://example.com/your-ad"
+                type="url"
+                required={false}
+              />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -259,6 +282,8 @@ function Field({
   type = "text",
   min,
   max,
+  inputMode,
+  required = true,
 }: {
   name: string;
   label: string;
@@ -267,6 +292,8 @@ function Field({
   type?: string;
   min?: string;
   max?: string;
+  inputMode?: "numeric";
+  required?: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -279,7 +306,8 @@ function Field({
         type={type}
         min={min}
         max={max}
-        required
+        inputMode={inputMode}
+        required={required}
       />
     </div>
   );

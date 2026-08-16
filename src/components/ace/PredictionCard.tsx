@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { CalendarClock, Clock, Lock, PlayCircle, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { unlock, type Prediction } from "@/lib/ace";
+import { playRewardedAd } from "@/lib/rewarded-ad";
 
 const PENDING_AD_KEY = "ace:pending-ad";
 
@@ -31,6 +33,7 @@ export function PredictionCard({
   onUnlocked: (id: string) => void;
 }) {
   const [openingAd, setOpeningAd] = useState(false);
+  const [playingAd, setPlayingAd] = useState(false);
   const locked = !unlocked;
 
   useEffect(() => {
@@ -62,8 +65,12 @@ export function PredictionCard({
     };
   }, [onUnlocked, prediction.id]);
 
-  function watchAd() {
-    if (openingAd || !prediction.adUrl) return;
+  function openAdLink() {
+    if (!prediction.adUrl) {
+      toast.error("This pick has no ad configured yet.");
+      return;
+    }
+
     setOpeningAd(true);
     window.localStorage.setItem(
       PENDING_AD_KEY,
@@ -75,6 +82,26 @@ export function PredictionCard({
       adWindow.opener = null;
     } else {
       window.location.assign(prediction.adUrl);
+    }
+  }
+
+  async function watchAd() {
+    if (openingAd || playingAd) return;
+
+    if (!prediction.adZoneId) {
+      openAdLink();
+      return;
+    }
+
+    setPlayingAd(true);
+    try {
+      await playRewardedAd(prediction.adZoneId);
+      unlock(prediction.id);
+      onUnlocked(prediction.id);
+    } catch {
+      openAdLink();
+    } finally {
+      setPlayingAd(false);
     }
   }
 
@@ -137,9 +164,13 @@ export function PredictionCard({
             <Lock className="size-5 text-gold" />
           </div>
           <p className="text-xs text-muted-foreground">Premium pick locked</p>
-          <Button variant="hero" size="sm" onClick={watchAd} disabled={openingAd}>
+          <Button variant="hero" size="sm" onClick={watchAd} disabled={openingAd || playingAd}>
             <PlayCircle className="size-4" />
-            {openingAd ? "RETURN AFTER WATCHING" : "WATCH AD TO UNLOCK PICK"}
+            {playingAd
+              ? "LOADING AD…"
+              : openingAd
+                ? "RETURN AFTER WATCHING"
+                : "WATCH AD TO UNLOCK PICK"}
           </Button>
         </div>
       ) : null}

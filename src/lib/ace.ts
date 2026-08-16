@@ -11,6 +11,7 @@ export type Prediction = {
   odds: string;
   tip: string;
   confidence: number;
+  adZoneId: string;
   adUrl: string;
   slipImage?: string;
   updatedAt: string;
@@ -27,6 +28,7 @@ export const EMPTY_PREDICTION_SLOTS: Prediction[] = Array.from({ length: 5 }, (_
   odds: "",
   tip: "",
   confidence: 80,
+  adZoneId: "",
   adUrl: "",
   updatedAt: "",
 }));
@@ -41,6 +43,7 @@ type PredictionRow = {
   odds: string;
   tip: string;
   confidence: number;
+  ad_zone_id: string;
   ad_url: string;
   slip_image: string | null;
   updated_at: string;
@@ -81,6 +84,7 @@ function mapPrediction(row: PredictionRow): Prediction {
     odds: row.odds,
     tip: row.tip,
     confidence: row.confidence,
+    adZoneId: row.ad_zone_id ?? "",
     adUrl: row.ad_url,
     ...(row.slip_image ? { slipImage: row.slip_image } : {}),
     updatedAt: row.updated_at,
@@ -123,6 +127,7 @@ export async function savePredictionSlot(
     p_odds: prediction.odds,
     p_tip: prediction.tip,
     p_confidence: prediction.confidence,
+    p_ad_zone_id: prediction.adZoneId,
     p_ad_url: prediction.adUrl,
     p_slip_image: prediction.slipImage ?? null,
   });
