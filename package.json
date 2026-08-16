@@ -10,6 +10,7 @@
     "build:mobile": "vite build --config vite.mobile.config.ts",
     "android:sync": "npm run build:mobile && cap sync android",
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:release": "npm run android:sync && cd android && gradlew.bat assembleRelease bundleRelease",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."

@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
   appName: "ACE PREDICT",
   webDir: "dist-mobile",
   backgroundColor: "#17191f",
+  server: {
+    url: "https://theacepredict.vercel.app",
+    cleartext: false,
+  },
   android: {
     allowMixedContent: false,
   },
