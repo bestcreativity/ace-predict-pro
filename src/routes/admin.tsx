@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
 import { ADMIN_SESSION_KEY, addCustomPrediction, DAYS, type DayKey } from "@/lib/ace";
 
 export const Route = createFileRoute("/admin")({
@@ -67,7 +66,6 @@ function AdminPage() {
 
   return (
     <div className="shell-bg min-h-screen pb-20">
-      <Toaster />
       <header className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-8">
         <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/" })}>
           <ArrowLeft className="size-4" />
