@@ -58,7 +58,7 @@ function AdminPage() {
       tip: String(f.get("tip")),
       confidence: Number(f.get("confidence")) || 70,
       vip,
-      slipImage: slip,
+      ...(slip ? { slipImage: slip } : {}),
     });
     toast.success("Prediction published");
     e.currentTarget.reset();
