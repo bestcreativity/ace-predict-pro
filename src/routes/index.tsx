@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { Send } from "lucide-react";
 import { PredictionCard } from "@/components/ace/PredictionCard";
 import { SecretAdminGate } from "@/components/ace/SecretAdminGate";
 import {
@@ -70,13 +70,16 @@ function Index() {
           <h1 className="text-gradient-gold font-display text-3xl font-bold tracking-tight">
             ACE PREDICT
           </h1>
-          <span className="flex items-center gap-1.5 rounded-full bg-neon/12 px-3 py-1.5 text-xs font-semibold text-neon ring-1 ring-neon/40">
-            <TrendingUp className="size-3.5" /> Weekly Accuracy: 84%
-          </span>
+          <a
+            href="https://t.me/dacechannel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-full bg-neon/12 px-3 py-1.5 text-xs font-semibold text-neon ring-1 ring-neon/40"
+          >
+            <Send className="size-3.5" /> Join Telegram
+          </a>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Sharp daily picks. No account, no sign-up.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">We don't gamble, We invest</p>
       </header>
 
       <main className="mx-auto mt-6 max-w-2xl px-4">
