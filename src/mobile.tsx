@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
+import { keepAdsBelowContent } from "./lib/ad-placement";
 import "./styles.css";
 
 const container = document.getElementById("root");
@@ -17,3 +18,5 @@ createRoot(container).render(
     <RouterProvider router={router} />
   </StrictMode>,
 );
+
+keepAdsBelowContent();
