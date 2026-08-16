@@ -3,6 +3,7 @@ import { CalendarClock, Clock, Lock, PlayCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { unlock, type Prediction } from "@/lib/ace";
+import { canUseNativeAdMob, playAdMobRewardedAd } from "@/lib/admob";
 import { playRewardedAd } from "@/lib/rewarded-ad";
 
 const PENDING_AD_KEY = "ace:pending-ad";
@@ -88,18 +89,30 @@ export function PredictionCard({
   async function watchAd() {
     if (openingAd || playingAd) return;
 
-    if (!prediction.adZoneId) {
-      openAdLink();
-      return;
-    }
-
     setPlayingAd(true);
+    const nativeAdMob = canUseNativeAdMob();
+
     try {
-      await playRewardedAd(prediction.adZoneId);
-      unlock(prediction.id);
-      onUnlocked(prediction.id);
-    } catch {
+      if (nativeAdMob && (await playAdMobRewardedAd())) {
+        unlock(prediction.id);
+        onUnlocked(prediction.id);
+        return;
+      }
+
+      if (prediction.adZoneId) {
+        await playRewardedAd(prediction.adZoneId);
+        unlock(prediction.id);
+        onUnlocked(prediction.id);
+        return;
+      }
+
       openAdLink();
+    } catch {
+      if (nativeAdMob) {
+        toast.error("Video ad unavailable. Please try again shortly.");
+      } else {
+        openAdLink();
+      }
     } finally {
       setPlayingAd(false);
     }
