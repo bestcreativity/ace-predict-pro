@@ -100,7 +100,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
   }),
-  ...(!import.meta.env.VITE_MOBILE_BUILD ? { shellComponent: RootShell } : {}),
+  ...(!import.meta.env["VITE_MOBILE_BUILD"] ? { shellComponent: RootShell } : {}),
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,

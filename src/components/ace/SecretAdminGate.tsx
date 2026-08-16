@@ -4,13 +4,14 @@ import { ShieldCheck } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ADMIN_PIN_HASH, ADMIN_SESSION_KEY, hashPin } from "@/lib/ace";
+import { ADMIN_SESSION_KEY, verifyAdminPasscode } from "@/lib/ace";
 
 export function SecretAdminGate() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(false);
   const taps = useRef<number[]>([]);
 
   function handleTap() {
@@ -24,15 +25,22 @@ export function SecretAdminGate() {
     }
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (hashPin(pin) === ADMIN_PIN_HASH) {
-      window.sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
-      setOpen(false);
-      navigate({ to: "/admin" });
-    } else {
+    setChecking(true);
+    try {
+      if (await verifyAdminPasscode(pin)) {
+        window.sessionStorage.setItem(ADMIN_SESSION_KEY, pin);
+        setOpen(false);
+        navigate({ to: "/admin" });
+        return;
+      }
       setError(true);
       setPin("");
+    } catch {
+      setError(true);
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -74,8 +82,8 @@ export function SecretAdminGate() {
             {error ? (
               <p className="text-center text-xs text-destructive">Incorrect passcode.</p>
             ) : null}
-            <Button type="submit" variant="hero" className="w-full">
-              Unlock
+            <Button type="submit" variant="hero" className="w-full" disabled={checking}>
+              {checking ? "Checking…" : "Unlock"}
             </Button>
           </form>
         </DialogContent>

@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { Lock, PlayCircle, Sparkles, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarClock, Clock, Lock, PlayCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { showRewardedAd, unlock, type Prediction } from "@/lib/ace";
+import { unlock, type Prediction } from "@/lib/ace";
+
+const PENDING_AD_KEY = "ace:pending-ad";
 
 function ConfidenceBadge({ value }: { value: number }) {
   const strong = value >= 80;
@@ -28,15 +30,69 @@ export function PredictionCard({
   unlocked: boolean;
   onUnlocked: (id: string) => void;
 }) {
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const locked = prediction.vip && !unlocked;
+  const [openingAd, setOpeningAd] = useState(false);
+  const locked = !unlocked;
 
-  async function watchAd() {
-    if (countdown !== null) return;
-    await showRewardedAd((s) => setCountdown(s));
-    setCountdown(null);
-    unlock(prediction.id);
-    onUnlocked(prediction.id);
+  useEffect(() => {
+    function completePendingAd() {
+      try {
+        const raw = window.localStorage.getItem(PENDING_AD_KEY);
+        if (!raw) return;
+        const pending = JSON.parse(raw) as { id: string; openedAt: number };
+        if (pending.id !== prediction.id || Date.now() - pending.openedAt < 750) return;
+        window.localStorage.removeItem(PENDING_AD_KEY);
+        unlock(prediction.id);
+        onUnlocked(prediction.id);
+        setOpeningAd(false);
+      } catch {
+        window.localStorage.removeItem(PENDING_AD_KEY);
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") completePendingAd();
+    }
+
+    completePendingAd();
+    window.addEventListener("focus", completePendingAd);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", completePendingAd);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [onUnlocked, prediction.id]);
+
+  function watchAd() {
+    if (openingAd || !prediction.adUrl) return;
+    setOpeningAd(true);
+    window.localStorage.setItem(
+      PENDING_AD_KEY,
+      JSON.stringify({ id: prediction.id, openedAt: Date.now() }),
+    );
+
+    const adWindow = window.open(prediction.adUrl, "_blank");
+    if (adWindow) {
+      adWindow.opener = null;
+    } else {
+      window.location.assign(prediction.adUrl);
+    }
+  }
+
+  if (!prediction.published) {
+    return (
+      <article className="surface-card flex min-h-44 flex-col items-center justify-center gap-3 p-5 text-center">
+        <div className="flex size-12 items-center justify-center rounded-full bg-gold/10 ring-1 ring-gold/30">
+          <CalendarClock className="size-6 text-gold" />
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Prediction {prediction.slot}
+          </p>
+          <h3 className="mt-1 font-display text-lg font-semibold">Game Coming Soon</h3>
+          <p className="mt-1 text-xs text-muted-foreground">A new premium pick will appear here.</p>
+        </div>
+      </article>
+    );
   }
 
   return (
@@ -45,15 +101,9 @@ export function PredictionCard({
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           <span>{prediction.league}</span>
         </div>
-        {prediction.vip ? (
-          <span className="flex items-center gap-1 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40">
-            <Sparkles className="size-3" /> VIP
-          </span>
-        ) : (
-          <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-            FREE
-          </span>
-        )}
+        <span className="flex items-center gap-1 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40">
+          <Sparkles className="size-3" /> PREMIUM
+        </span>
       </div>
 
       <div className={locked ? "mt-3 select-none blur-[7px]" : "mt-3"}>
@@ -87,9 +137,9 @@ export function PredictionCard({
             <Lock className="size-5 text-gold" />
           </div>
           <p className="text-xs text-muted-foreground">Premium pick locked</p>
-          <Button variant="hero" size="sm" onClick={watchAd} disabled={countdown !== null}>
+          <Button variant="hero" size="sm" onClick={watchAd} disabled={openingAd}>
             <PlayCircle className="size-4" />
-            {countdown !== null ? `AD PLAYING… ${countdown}s` : "WATCH AD TO UNLOCK PICK"}
+            {openingAd ? "RETURN AFTER WATCHING" : "WATCH AD TO UNLOCK PICK"}
           </Button>
         </div>
       ) : null}

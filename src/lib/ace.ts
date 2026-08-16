@@ -1,139 +1,52 @@
+import { supabase } from "@/lib/supabase";
+
 export type Prediction = {
   id: string;
+  slot: number;
+  published: boolean;
   teamA: string;
   teamB: string;
   league: string;
   kickoff: string;
-  day: DayKey;
   odds: string;
   tip: string;
   confidence: number;
-  vip: boolean;
+  adUrl: string;
   slipImage?: string;
+  updatedAt: string;
 };
 
-export type DayKey = "today" | "tomorrow" | "sat" | "sun";
+export const EMPTY_PREDICTION_SLOTS: Prediction[] = Array.from({ length: 5 }, (_, index) => ({
+  id: `slot-${index + 1}`,
+  slot: index + 1,
+  published: false,
+  teamA: "",
+  teamB: "",
+  league: "",
+  kickoff: "",
+  odds: "",
+  tip: "",
+  confidence: 80,
+  adUrl: "",
+  updatedAt: "",
+}));
 
-export const DAYS: { key: DayKey; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "tomorrow", label: "Tomorrow" },
-  { key: "sat", label: "Sat" },
-  { key: "sun", label: "Sun" },
-];
-
-export const BASE_PREDICTIONS: Prediction[] = [
-  {
-    id: "p1",
-    teamA: "Arsenal",
-    teamB: "Chelsea",
-    league: "Premier League",
-    kickoff: "17:30",
-    day: "today",
-    odds: "1.80",
-    tip: "Home Win",
-    confidence: 88,
-    vip: false,
-  },
-  {
-    id: "p2",
-    teamA: "Inter",
-    teamB: "Napoli",
-    league: "Serie A",
-    kickoff: "20:45",
-    day: "today",
-    odds: "1.65",
-    tip: "Over 2.5 Goals",
-    confidence: 76,
-    vip: false,
-  },
-  {
-    id: "p3",
-    teamA: "Real Madrid",
-    teamB: "Sevilla",
-    league: "La Liga",
-    kickoff: "21:00",
-    day: "today",
-    odds: "2.10",
-    tip: "Home Win & Over 1.5",
-    confidence: 92,
-    vip: true,
-  },
-  {
-    id: "p4",
-    teamA: "Bayern",
-    teamB: "Leipzig",
-    league: "Bundesliga",
-    kickoff: "18:30",
-    day: "tomorrow",
-    odds: "1.95",
-    tip: "Both Teams To Score",
-    confidence: 81,
-    vip: false,
-  },
-  {
-    id: "p5",
-    teamA: "PSG",
-    teamB: "Marseille",
-    league: "Ligue 1",
-    kickoff: "20:00",
-    day: "tomorrow",
-    odds: "2.35",
-    tip: "Home -1 Handicap",
-    confidence: 85,
-    vip: true,
-  },
-  {
-    id: "p6",
-    teamA: "Ajax",
-    teamB: "PSV",
-    league: "Eredivisie",
-    kickoff: "16:45",
-    day: "sat",
-    odds: "1.72",
-    tip: "Draw No Bet — Away",
-    confidence: 74,
-    vip: false,
-  },
-  {
-    id: "p7",
-    teamA: "Benfica",
-    teamB: "Porto",
-    league: "Primeira Liga",
-    kickoff: "19:15",
-    day: "sat",
-    odds: "2.55",
-    tip: "Correct Score 2-1",
-    confidence: 69,
-    vip: true,
-  },
-  {
-    id: "p8",
-    teamA: "Man City",
-    teamB: "Liverpool",
-    league: "Premier League",
-    kickoff: "16:30",
-    day: "sun",
-    odds: "1.88",
-    tip: "Over 2.5 Goals",
-    confidence: 90,
-    vip: true,
-  },
-  {
-    id: "p9",
-    teamA: "Roma",
-    teamB: "Lazio",
-    league: "Serie A",
-    kickoff: "18:00",
-    day: "sun",
-    odds: "1.60",
-    tip: "Under 3.5 Goals",
-    confidence: 78,
-    vip: false,
-  },
-];
+type PredictionRow = {
+  slot: number;
+  published: boolean;
+  team_a: string;
+  team_b: string;
+  league: string;
+  kickoff: string;
+  odds: string;
+  tip: string;
+  confidence: number;
+  ad_url: string;
+  slip_image: string | null;
+  updated_at: string;
+};
 
 const UNLOCK_KEY = "ace:unlocked";
-const CUSTOM_KEY = "ace:custom";
 export const ADMIN_SESSION_KEY = "ace:admin";
 
 function read<T>(key: string, fallback: T): T {
@@ -156,41 +69,64 @@ export function unlock(id: string): string[] {
   return next;
 }
 
-export function getCustomPredictions(): Prediction[] {
-  return read<Prediction[]>(CUSTOM_KEY, []);
+function mapPrediction(row: PredictionRow): Prediction {
+  return {
+    id: `slot-${row.slot}`,
+    slot: row.slot,
+    published: row.published,
+    teamA: row.team_a,
+    teamB: row.team_b,
+    league: row.league,
+    kickoff: row.kickoff,
+    odds: row.odds,
+    tip: row.tip,
+    confidence: row.confidence,
+    adUrl: row.ad_url,
+    ...(row.slip_image ? { slipImage: row.slip_image } : {}),
+    updatedAt: row.updated_at,
+  };
 }
 
-export function addCustomPrediction(p: Prediction) {
-  const next = [p, ...getCustomPredictions()];
-  window.localStorage.setItem(CUSTOM_KEY, JSON.stringify(next));
-  return next;
+export async function getPredictionSlots(): Promise<Prediction[]> {
+  const { data, error } = await supabase
+    .from("ace_prediction_slots")
+    .select("*")
+    .order("slot", { ascending: true });
+
+  if (error) throw error;
+  return (data as PredictionRow[]).map(mapPrediction);
 }
 
-/** Lightweight djb2 hash — the raw passcode is never stored in source. */
-export function hashPin(pin: string): string {
-  let h = 5381;
-  for (let i = 0; i < pin.length; i++) h = ((h << 5) + h + pin.charCodeAt(i)) >>> 0;
-  return h.toString(16);
-}
-
-/** Hash of the admin passcode. */
-export const ADMIN_PIN_HASH = hashPin("Td63hdYEND8ne7394h47f");
-
-/**
- * Rewarded ad hook. On native this wires to Google AdMob's rewarded ad
- * callback; on web we simulate the ad countdown and resolve on completion.
- */
-export function showRewardedAd(onTick: (secondsLeft: number) => void): Promise<boolean> {
-  return new Promise((resolve) => {
-    let left = 5;
-    onTick(left);
-    const timer = setInterval(() => {
-      left -= 1;
-      onTick(left);
-      if (left <= 0) {
-        clearInterval(timer);
-        resolve(true);
-      }
-    }, 1000);
+export async function verifyAdminPasscode(passcode: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("verify_ace_admin_passcode", {
+    p_admin_passcode: passcode,
   });
+
+  if (error) throw error;
+  return data === true;
+}
+
+export type PredictionSlotInput = Omit<Prediction, "id" | "updatedAt">;
+
+export async function savePredictionSlot(
+  passcode: string,
+  prediction: PredictionSlotInput,
+): Promise<Prediction> {
+  const { data, error } = await supabase.rpc("manage_ace_prediction_slot", {
+    p_admin_passcode: passcode,
+    p_slot: prediction.slot,
+    p_published: prediction.published,
+    p_team_a: prediction.teamA,
+    p_team_b: prediction.teamB,
+    p_league: prediction.league,
+    p_kickoff: prediction.kickoff,
+    p_odds: prediction.odds,
+    p_tip: prediction.tip,
+    p_confidence: prediction.confidence,
+    p_ad_url: prediction.adUrl,
+    p_slip_image: prediction.slipImage ?? null,
+  });
+
+  if (error) throw error;
+  return mapPrediction(data as PredictionRow);
 }

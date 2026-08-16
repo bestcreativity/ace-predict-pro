@@ -1,30 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { PredictionCard } from "@/components/ace/PredictionCard";
 import { SecretAdminGate } from "@/components/ace/SecretAdminGate";
 import {
-  BASE_PREDICTIONS,
-  DAYS,
-  getCustomPredictions,
+  EMPTY_PREDICTION_SLOTS,
+  getPredictionSlots,
   getUnlocked,
-  type DayKey,
   type Prediction,
 } from "@/lib/ace";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ACE PREDICT — Daily Football Predictions & VIP Picks" },
+      { title: "ACE PREDICT — Premium Football Predictions" },
       {
         name: "description",
         content:
-          "Free and VIP football predictions with odds, kickoff times and confidence ratings. No sign-up required.",
+          "Premium football predictions with odds, kickoff times and confidence ratings. No sign-up required.",
       },
       { property: "og:title", content: "ACE PREDICT — Daily Football Predictions" },
       {
         property: "og:description",
-        content: "Expert daily football tips with confidence ratings. Unlock VIP picks instantly.",
+        content: "Expert football tips with confidence ratings. Watch an ad to unlock each pick.",
       },
     ],
   }),
@@ -32,19 +30,38 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [day, setDay] = useState<DayKey>("today");
   const [unlocked, setUnlocked] = useState<string[]>([]);
-  const [custom, setCustom] = useState<Prediction[]>([]);
+  const [slots, setSlots] = useState<Prediction[]>(EMPTY_PREDICTION_SLOTS);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     setUnlocked(getUnlocked());
-    setCustom(getCustomPredictions());
   }, []);
 
-  const all = useMemo(() => [...custom, ...BASE_PREDICTIONS], [custom]);
-  const list = all.filter((p) => p.day === day);
-  const free = list.filter((p) => !p.vip);
-  const vip = list.filter((p) => p.vip);
+  const refreshSlots = useCallback(async () => {
+    try {
+      setSlots(await getPredictionSlots());
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    }
+  }, []);
+  const handleUnlocked = useCallback((id: string) => {
+    setUnlocked((current) => [...new Set([...current, id])]);
+  }, []);
+
+  useEffect(() => {
+    void refreshSlots();
+    const timer = window.setInterval(() => void refreshSlots(), 30_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshSlots();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [refreshSlots]);
 
   return (
     <div className="shell-bg min-h-screen pb-20">
@@ -60,65 +77,35 @@ function Index() {
         <p className="mt-2 text-sm text-muted-foreground">
           Sharp daily picks. No account, no sign-up.
         </p>
-
-        <nav className="mt-5 flex gap-2 overflow-x-auto rounded-xl bg-secondary/50 p-1.5">
-          {DAYS.map((d) => (
-            <button
-              key={d.key}
-              onClick={() => setDay(d.key)}
-              className={
-                "flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors " +
-                (day === d.key
-                  ? "bg-[image:var(--gradient-gold)] text-gold-foreground"
-                  : "text-muted-foreground hover:text-foreground")
-              }
-            >
-              {d.label}
-            </button>
-          ))}
-        </nav>
       </header>
 
-      <main className="mx-auto mt-6 max-w-2xl space-y-6 px-4">
-        <Section title="Free Predictions" items={free} unlocked={unlocked} setUnlocked={setUnlocked} />
-        <Section title="VIP Predictions" items={vip} unlocked={unlocked} setUnlocked={setUnlocked} />
+      <main className="mx-auto mt-6 max-w-2xl px-4">
+        <section>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Premium Predictions
+            </h2>
+            <span className="text-[11px] text-muted-foreground">5 daily slots</span>
+          </div>
+          {loadError ? (
+            <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Could not refresh predictions. Showing the latest available slots.
+            </p>
+          ) : null}
+          <div className="space-y-3">
+            {slots.map((prediction) => (
+              <PredictionCard
+                key={prediction.id}
+                prediction={prediction}
+                unlocked={unlocked.includes(prediction.id)}
+                onUnlocked={handleUnlocked}
+              />
+            ))}
+          </div>
+        </section>
       </main>
 
       <SecretAdminGate />
     </div>
-  );
-}
-
-function Section({
-  title,
-  items,
-  unlocked,
-  setUnlocked,
-}: {
-  title: string;
-  items: Prediction[];
-  unlocked: string[];
-  setUnlocked: (v: string[]) => void;
-}) {
-  return (
-    <section>
-      <h2 className="mb-3 font-display text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-        {title}
-      </h2>
-      {items.length === 0 ? (
-        <p className="surface-card p-4 text-sm text-muted-foreground">No matches listed yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((p) => (
-            <PredictionCard
-              key={p.id}
-              prediction={p}
-              unlocked={unlocked.includes(p.id)}
-              onUnlocked={(id) => setUnlocked([...unlocked, id])}
-            />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
