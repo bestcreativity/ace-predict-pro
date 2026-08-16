@@ -14,7 +14,7 @@ export function SecretAdminGate() {
 
   function handleTap() {
     const now = Date.now();
-    taps.current = [...taps.current, now].filter((t) => now - t < 2000);
+    taps.current = [...taps.current, now].filter((t) => now - t < 4000);
     if (taps.current.length >= 5) {
       taps.current = [];
       setPin("");
@@ -46,9 +46,13 @@ export function SecretAdminGate() {
       <button
         aria-label="."
         onClick={handleTap}
-        className="fixed bottom-3 right-3 z-40 h-3 w-3 rounded-full bg-foreground opacity-30"
-        style={{ width: 12, height: 12 }}
-      />
+        className="fixed bottom-0 right-0 z-40 flex h-12 w-12 items-center justify-center bg-transparent"
+      >
+        <span
+          className="rounded-full bg-foreground opacity-30"
+          style={{ width: 12, height: 12 }}
+        />
+      </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xs border-border bg-popover">
