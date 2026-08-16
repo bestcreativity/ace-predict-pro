@@ -168,3 +168,24 @@
     color: var(--color-foreground);
   }
 }
+
+@utility surface-card {
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--card) 92%, white 4%),
+    var(--card)
+  );
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+@utility text-gradient-gold {
+  background: var(--gradient-gold);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility shell-bg {
+  background: var(--gradient-shell);
+}
