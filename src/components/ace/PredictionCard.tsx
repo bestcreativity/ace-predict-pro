@@ -3,7 +3,7 @@ import { CalendarClock, Clock, Lock, PlayCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { unlock, type Prediction } from "@/lib/ace";
-import { canUseNativeAdMob, playAdMobRewardedAd } from "@/lib/admob";
+import { canUseNativeAdMob, describeAdMobError, playAdMobRewardedAd } from "@/lib/admob";
 import { playRewardedAd } from "@/lib/rewarded-ad";
 
 const PENDING_AD_KEY = "ace:pending-ad";
@@ -86,33 +86,38 @@ export function PredictionCard({
     }
   }
 
+  function completeUnlock() {
+    unlock(prediction.id);
+    onUnlocked(prediction.id);
+  }
+
   async function watchAd() {
     if (openingAd || playingAd) return;
-
     setPlayingAd(true);
-    const nativeAdMob = canUseNativeAdMob();
 
     try {
-      if (nativeAdMob && (await playAdMobRewardedAd())) {
-        unlock(prediction.id);
-        onUnlocked(prediction.id);
-        return;
+      if (canUseNativeAdMob()) {
+        try {
+          if (await playAdMobRewardedAd()) {
+            completeUnlock();
+            return;
+          }
+        } catch (error) {
+          toast.error(`Video ad unavailable: ${describeAdMobError(error)}`);
+        }
       }
 
       if (prediction.adZoneId) {
-        await playRewardedAd(prediction.adZoneId);
-        unlock(prediction.id);
-        onUnlocked(prediction.id);
-        return;
+        try {
+          await playRewardedAd(prediction.adZoneId);
+          completeUnlock();
+          return;
+        } catch {
+          /* Fall back to the direct link below. */
+        }
       }
 
       openAdLink();
-    } catch {
-      if (nativeAdMob) {
-        toast.error("Video ad unavailable. Please try again shortly.");
-      } else {
-        openAdLink();
-      }
     } finally {
       setPlayingAd(false);
     }

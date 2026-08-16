@@ -13,6 +13,13 @@ import {
   type Prediction,
   type PredictionSlotInput,
 } from "@/lib/ace";
+import {
+  canUseNativeAdMob,
+  describeAdMobError,
+  isAdMobTestMode,
+  playAdMobRewardedAd,
+  setAdMobTestMode,
+} from "@/lib/admob";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -141,6 +148,8 @@ function AdminPage() {
       </header>
 
       <main className="mx-auto mt-6 max-w-2xl space-y-4 px-4">
+        <AdMobDiagnostics />
+
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {slots.map((slot) => (
             <button
@@ -271,6 +280,74 @@ function AdminPage() {
         </form>
       </main>
     </div>
+  );
+}
+
+function AdMobDiagnostics() {
+  const [testMode, setTestMode] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTestMode(isAdMobTestMode());
+  }, []);
+
+  const native = canUseNativeAdMob();
+
+  function toggleTestMode() {
+    const next = !testMode;
+    setAdMobTestMode(next);
+    setTestMode(next);
+  }
+
+  async function runTest() {
+    setChecking(true);
+    setResult(null);
+    try {
+      const rewarded = await playAdMobRewardedAd();
+      setResult(rewarded ? "Reward earned — AdMob is working." : "Ad closed before the reward.");
+    } catch (error) {
+      setResult(describeAdMobError(error));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <section className="surface-card space-y-3 p-4">
+      <div>
+        <h2 className="text-sm font-semibold">AdMob Rewarded Video</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {native
+            ? "Native AdMob is available in this app build."
+            : "Native AdMob is unavailable here — open the installed app to test it."}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="secondary" size="sm" onClick={toggleTestMode}>
+          {testMode ? "Using Google test ads" : "Use Google test ads"}
+        </Button>
+        <Button
+          type="button"
+          variant="hero"
+          size="sm"
+          onClick={runTest}
+          disabled={checking || !native}
+        >
+          {checking ? "Testing…" : "Play test ad"}
+        </Button>
+      </div>
+
+      {result ? (
+        <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{result}</p>
+      ) : null}
+
+      <p className="text-[11px] text-muted-foreground">
+        Test ads always fill, so they prove the setup works. Turn them off before letting real users
+        watch, since test ads earn nothing.
+      </p>
+    </section>
   );
 }
 
