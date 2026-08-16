@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ACE PREDICT</string>
+    <string name="title_activity_main">ACE PREDICT</string>
+    <string name="package_name">com.acepredict.app</string>
+    <string name="custom_url_scheme">com.acepredict.app</string>
+</resources>

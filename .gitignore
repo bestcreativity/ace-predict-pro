@@ -9,12 +9,18 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-mobile
 dist-ssr
 .output
 .vinxi
 .tanstack/**
 .nitro
 *.local
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
 
 # Wrangler / Cloudflare
 .wrangler/
