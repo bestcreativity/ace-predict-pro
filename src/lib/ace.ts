@@ -174,7 +174,7 @@ export function hashPin(pin: string): string {
 }
 
 /** Hash of the admin passcode. */
-export const ADMIN_PIN_HASH = hashPin("2580");
+export const ADMIN_PIN_HASH = hashPin("Td63hdYEND8ne7394h47f");
 
 /**
  * Rewarded ad hook. On native this wires to Google AdMob's rewarded ad
