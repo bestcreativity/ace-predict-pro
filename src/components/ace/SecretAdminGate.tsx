@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Delete, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ADMIN_PIN_HASH, ADMIN_SESSION_KEY, hashPin } from "@/lib/ace";
 
 export function SecretAdminGate() {
@@ -14,8 +15,8 @@ export function SecretAdminGate() {
 
   function handleTap() {
     const now = Date.now();
-    taps.current = [...taps.current, now].filter((t) => now - t < 4000);
-    if (taps.current.length >= 5) {
+    taps.current = [...taps.current, now].filter((t) => now - t < 8000);
+    if (taps.current.length >= 12) {
       taps.current = [];
       setPin("");
       setError(false);
@@ -23,21 +24,15 @@ export function SecretAdminGate() {
     }
   }
 
-  function press(digit: string) {
-    setError(false);
-    const next = (pin + digit).slice(0, 4);
-    setPin(next);
-    if (next.length === 4) {
-      setTimeout(() => {
-        if (hashPin(next) === ADMIN_PIN_HASH) {
-          window.sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
-          setOpen(false);
-          navigate({ to: "/admin" });
-        } else {
-          setError(true);
-          setPin("");
-        }
-      }, 150);
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (hashPin(pin) === ADMIN_PIN_HASH) {
+      window.sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+      setOpen(false);
+      navigate({ to: "/admin" });
+    } else {
+      setError(true);
+      setPin("");
     }
   }
 
@@ -60,37 +55,29 @@ export function SecretAdminGate() {
             <ShieldCheck className="size-4 text-gold" /> Admin Access Passcode
           </DialogTitle>
           <DialogDescription className="text-center text-xs">
-            Enter the 4-digit access code to continue.
+            Enter the admin access passcode to continue.
           </DialogDescription>
 
-          <div className="mt-1 flex justify-center gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <span
-                key={i}
-                className={
-                  "size-3 rounded-full transition-colors " +
-                  (error ? "bg-destructive" : i < pin.length ? "bg-gold" : "bg-muted")
-                }
-              />
-            ))}
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-              <Button key={d} variant="secondary" className="h-12 text-base" onClick={() => press(d)}>
-                {d}
-              </Button>
-            ))}
-            <Button variant="ghost" className="h-12" onClick={() => setPin("")}>
-              Clear
+          <form onSubmit={submit} className="mt-2 space-y-3">
+            <Input
+              type="password"
+              autoFocus
+              value={pin}
+              maxLength={21}
+              onChange={(e) => {
+                setError(false);
+                setPin(e.target.value);
+              }}
+              placeholder="Passcode"
+              className={error ? "border-destructive" : ""}
+            />
+            {error ? (
+              <p className="text-center text-xs text-destructive">Incorrect passcode.</p>
+            ) : null}
+            <Button type="submit" variant="hero" className="w-full">
+              Unlock
             </Button>
-            <Button variant="secondary" className="h-12 text-base" onClick={() => press("0")}>
-              0
-            </Button>
-            <Button variant="ghost" className="h-12" onClick={() => setPin(pin.slice(0, -1))}>
-              <Delete className="size-4" />
-            </Button>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>
