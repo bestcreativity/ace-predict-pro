@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const API_BASE = "https://v3.football.api-sports.io";
 const TIME_ZONE = "Africa/Lagos";
-const MAX_PREDICTION_REQUESTS = 30;
+const MAX_CANDIDATES = 20;
 
 const POPULAR_LEAGUES = new Set([
   2, 3, 39, 45, 61, 66, 71, 78, 81, 88, 94, 128, 135, 137, 140, 143, 203, 253,
@@ -25,13 +25,16 @@ type Fixture = {
     type?: string;
   };
   teams: {
-    home: { name: string };
-    away: { name: string };
+    home: { id: number; name: string };
+    away: { id: number; name: string };
   };
+  goals?: { home: number | null; away: number | null };
 };
 
 type SelectedPrediction = {
   fixtureId: number;
+  leagueId: number;
+  popular: boolean;
   teamA: string;
   teamB: string;
   league: string;
@@ -39,15 +42,16 @@ type SelectedPrediction = {
   tip: string;
   confidence: number;
   odds: string;
+  score: number;
 };
 
-function lagosDate() {
+function lagosDate(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(new Date());
+  }).formatToParts(date);
 
   const value = (type: string) => parts.find((part) => part.type === type)?.value;
   return `${value("year")}-${value("month")}-${value("day")}`;
@@ -62,32 +66,17 @@ function kickoffTime(value: string) {
   }).format(new Date(value));
 }
 
-function percentage(value: unknown) {
-  const parsed = Number.parseInt(String(value ?? "").replace("%", ""), 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+function poissonOver(totalGoals: number, line: number) {
+  const maxGoals = Math.floor(line);
+  let cumulative = 0;
+  let factorial = 1;
 
-function predictionConfidence(
-  advice: string,
-  percentages: JsonRecord,
-  homeTeam: string,
-  awayTeam: string,
-) {
-  const home = percentage(percentages.home);
-  const draw = percentage(percentages.draw);
-  const away = percentage(percentages.away);
-  const normalized = advice.toLowerCase();
-  const coversDraw = normalized.includes("draw");
-  const coversHome = normalized.includes(homeTeam.toLowerCase());
-  const coversAway = normalized.includes(awayTeam.toLowerCase());
-
-  if (normalized.includes("double chance") || normalized.includes("combo")) {
-    if (coversHome && coversDraw) return home + draw;
-    if (coversAway && coversDraw) return away + draw;
-    if (coversHome && coversAway) return home + away;
+  for (let goals = 0; goals <= maxGoals; goals += 1) {
+    if (goals > 0) factorial *= goals;
+    cumulative += Math.exp(-totalGoals) * totalGoals ** goals / factorial;
   }
 
-  return Math.max(home, draw, away);
+  return Math.max(0.05, Math.min(0.9, 1 - cumulative));
 }
 
 function fixtureIsSuitable(item: Fixture) {
@@ -183,53 +172,126 @@ Deno.serve(async (request: Request) => {
     );
     const fixtures = ((fixtureBody.response ?? []) as Fixture[])
       .filter(fixtureIsSuitable)
+      .filter((fixture) => lagosDate(new Date(fixture.fixture.date)) === runDate)
       .sort(
         (left, right) =>
           new Date(left.fixture.date).getTime() - new Date(right.fixture.date).getTime(),
       );
 
     const candidates = diversify(fixtures);
-    const selected: SelectedPrediction[] = [];
-    let predictionRequests = 0;
+    const analysed: SelectedPrediction[] = [];
+    const historyCache = new Map<number, { scored: number; conceded: number } | null>();
 
-    for (const item of candidates) {
-      if (selected.length >= 5 || predictionRequests >= MAX_PREDICTION_REQUESTS) break;
-      predictionRequests += 1;
+    async function teamForm(teamId: number) {
+      if (historyCache.has(teamId)) return historyCache.get(teamId) ?? null;
 
+      const body = await api(`/fixtures?team=${teamId}&last=5`);
+      const history = ((body.response ?? []) as Fixture[]).filter(
+        (match) => match.goals?.home != null && match.goals?.away != null,
+      );
+      if (history.length < 3) {
+        historyCache.set(teamId, null);
+        return null;
+      }
+
+      let scored = 0;
+      let conceded = 0;
+      for (const match of history) {
+        const wasHome = match.teams.home.id === teamId;
+        scored += Number(wasHome ? match.goals?.home : match.goals?.away);
+        conceded += Number(wasHome ? match.goals?.away : match.goals?.home);
+      }
+
+      const form = { scored: scored / history.length, conceded: conceded / history.length };
+      historyCache.set(teamId, form);
+      return form;
+    }
+
+    for (const item of candidates.slice(0, MAX_CANDIDATES)) {
       try {
-        const predictionBody = await api(`/predictions?fixture=${item.fixture.id}`);
-        const prediction = (predictionBody.response as JsonRecord[] | undefined)?.[0];
-        const pick = prediction?.predictions as JsonRecord | undefined;
-        const percentages = pick?.percent as JsonRecord | undefined;
-        const advice = String(pick?.advice ?? "").trim();
+        const [home, away] = await Promise.all([
+          teamForm(item.teams.home.id),
+          teamForm(item.teams.away.id),
+        ]);
+        if (!home || !away) continue;
 
-        const confidence = predictionConfidence(
-          advice,
-          percentages ?? {},
-          item.teams.home.name,
-          item.teams.away.name,
+        const expectedHome = Math.max(0.2, ((home.scored + away.conceded) / 2) * 1.08);
+        const expectedAway = Math.max(0.2, (away.scored + home.conceded) / 2);
+        const expectedTotal = expectedHome + expectedAway;
+        const over25 = poissonOver(expectedTotal, 2.5);
+        const over35 = poissonOver(expectedTotal, 3.5);
+        const bothTeamsScore =
+          (1 - Math.exp(-expectedHome)) * (1 - Math.exp(-expectedAway));
+        const combo = Math.min(over25, bothTeamsScore) * 0.9;
+        const markets = [
+          { tip: "Over 3.5 Goals", probability: over35, preference: 3 },
+          { tip: "Over 2.5 & GG", probability: combo, preference: 2 },
+          { tip: "Over 2.5 Goals", probability: over25, preference: 1 },
+        ].filter(({ probability }) => probability >= 0.25);
+        const market = markets.sort(
+          (left, right) =>
+            Math.abs(left.probability - 0.43) -
+              Math.abs(right.probability - 0.43) ||
+            right.preference - left.preference,
+        )[0];
+        if (!market) continue;
+
+        // This is a model-quality score, deliberately kept in the requested
+        // 80–95 display range; the estimated odds still use raw probability.
+        const confidence = Math.min(
+          95,
+          Math.max(80, Math.round(80 + (market.probability - 0.25) * 35)),
         );
-
-        if (!advice || confidence < 45) continue;
-
-        // API-Football predictions do not provide bookmaker odds. This is a
-        // conservative model estimate and is labelled as such in the UI.
-        const estimatedOdds = Math.min(4, Math.max(1.15, 92 / confidence)).toFixed(2);
-
-        selected.push({
+        const estimatedOdds = Math.min(6, 0.92 / market.probability).toFixed(2);
+        analysed.push({
           fixtureId: item.fixture.id,
+          leagueId: item.league.id,
+          popular: POPULAR_LEAGUES.has(item.league.id),
           teamA: item.teams.home.name,
           teamB: item.teams.away.name,
           league: `${item.league.country} · ${item.league.name}`,
           kickoff: kickoffTime(item.fixture.date),
-          tip: advice,
-          confidence: Math.min(95, confidence),
+          tip: market.tip,
+          confidence,
           odds: `Est. ${estimatedOdds}`,
+          score:
+            120 -
+            Math.abs(market.probability - 0.43) * 100 +
+            expectedTotal * 5 +
+            market.preference * 3,
         });
       } catch {
-        // Some small leagues do not have enough data for API-Football's
-        // prediction endpoint. Continue until five supported matches are found.
+        // Move to another league if a team has no recent-results coverage.
       }
+
+      if (
+        analysed.length >= 10 ||
+        (analysed.filter((pick) => pick.popular).length >= 3 &&
+          analysed.filter((pick) => !pick.popular).length >= 3)
+      ) {
+        break;
+      }
+    }
+
+    analysed.sort((left, right) => right.score - left.score);
+    const popular = analysed.filter((item) => item.popular);
+    const emerging = analysed.filter((item) => !item.popular);
+    const selected: SelectedPrediction[] = [];
+    const usedLeagues = new Set<number>();
+
+    const takeBest = (pool: SelectedPrediction[]) => {
+      const pick =
+        pool.find((item) => !usedLeagues.has(item.leagueId)) ??
+        pool.find((item) => !selected.some((selectedItem) => selectedItem.fixtureId === item.fixtureId));
+      if (!pick || selected.some((item) => item.fixtureId === pick.fixtureId)) return;
+      selected.push(pick);
+      usedLeagues.add(pick.leagueId);
+    };
+
+    for (const pool of [popular, emerging, popular, emerging, popular]) takeBest(pool);
+    for (const pick of analysed) {
+      if (selected.length >= 5) break;
+      if (!selected.some((item) => item.fixtureId === pick.fixtureId)) selected.push(pick);
     }
 
     for (let index = 0; index < 5; index += 1) {
