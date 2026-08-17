@@ -136,18 +136,18 @@ function AdminPage() {
   if (!passcode) return null;
 
   return (
-    <div className="shell-bg min-h-screen pb-20">
-      <header className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-8">
+    <div className="shell-bg min-h-dvh pb-20">
+      <header className="mx-auto flex w-full max-w-2xl items-start gap-2 px-3 pt-6 sm:items-center sm:gap-3 sm:px-4 sm:pt-8">
         <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/" })}>
           <ArrowLeft className="size-4" />
         </Button>
-        <div>
-          <h1 className="text-gradient-gold font-display text-2xl font-bold">Manage Predictions</h1>
+        <div className="min-w-0">
+          <h1 className="text-gradient-gold break-words font-display text-xl font-bold sm:text-2xl">Manage Predictions</h1>
           <p className="text-xs text-muted-foreground">Choose and update any of the five live cards.</p>
         </div>
       </header>
 
-      <main className="mx-auto mt-6 max-w-2xl space-y-4 px-4">
+      <main className="mx-auto mt-5 w-full max-w-2xl space-y-4 px-3 sm:mt-6 sm:px-4">
         <AdMobDiagnostics />
 
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -177,9 +177,9 @@ function AdminPage() {
         <form
           key={`${selected.slot}-${selected.updatedAt}`}
           onSubmit={publish}
-          className="surface-card space-y-5 p-5"
+          className="surface-card min-w-0 space-y-5 p-4 sm:p-5"
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground">Editing</p>
               <h2 className="font-display text-xl font-semibold">Prediction {selectedSlot}</h2>

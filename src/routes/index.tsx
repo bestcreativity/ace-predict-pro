@@ -64,17 +64,17 @@ function Index() {
   }, [refreshSlots]);
 
   return (
-    <div className="shell-bg min-h-screen pb-56">
-      <header className="mx-auto max-w-2xl px-4 pt-8">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-gradient-gold font-display text-3xl font-bold tracking-tight">
+    <div className="shell-bg min-h-dvh pb-56">
+      <header className="mx-auto w-full max-w-2xl px-3 pt-6 sm:px-4 sm:pt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-gradient-gold min-w-0 font-display text-[clamp(1.65rem,8vw,2rem)] font-bold tracking-tight">
             ACE PREDICT
           </h1>
           <a
             href="https://t.me/dacechannel"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-full bg-neon/12 px-3 py-1.5 text-xs font-semibold text-neon ring-1 ring-neon/40"
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-neon/12 px-3 py-1.5 text-xs font-semibold text-neon ring-1 ring-neon/40"
           >
             <Send className="size-3.5" /> Join Telegram
           </a>
@@ -82,7 +82,7 @@ function Index() {
         <p className="mt-2 text-sm text-muted-foreground">We don't gamble, We invest</p>
       </header>
 
-      <main className="mx-auto mt-6 max-w-2xl px-4">
+      <main className="mx-auto mt-5 w-full max-w-2xl px-3 sm:mt-6 sm:px-4">
         <section>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">

@@ -16,6 +16,9 @@ import android.widget.TextView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static final long MIN_SPLASH_DURATION_MS = 5000;
+    private static final long MAX_SPLASH_DURATION_MS = 15000;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -94,13 +97,29 @@ public class MainActivity extends BridgeActivity {
             .setDuration(500)
             .start();
 
+        long startedAt = android.os.SystemClock.uptimeMillis();
         splash.postDelayed(
-            () -> splash.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction(() -> root.removeView(splash))
-                .start(),
-            1700
+            () -> hideSplashWhenReady(root, splash, startedAt),
+            MIN_SPLASH_DURATION_MS
         );
+    }
+
+    private void hideSplashWhenReady(FrameLayout root, LinearLayout splash, long startedAt) {
+        boolean pageLoaded = bridge != null
+            && bridge.getWebView() != null
+            && bridge.getWebView().getProgress() >= 100;
+        boolean reachedMaximum =
+            android.os.SystemClock.uptimeMillis() - startedAt >= MAX_SPLASH_DURATION_MS;
+
+        if (!pageLoaded && !reachedMaximum) {
+            splash.postDelayed(() -> hideSplashWhenReady(root, splash, startedAt), 250);
+            return;
+        }
+
+        splash.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction(() -> root.removeView(splash))
+            .start();
     }
 }

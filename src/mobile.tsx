@@ -21,8 +21,8 @@ function MobileApp() {
   useEffect(() => {
     if (!showSplash) return;
 
-    const closeTimer = window.setTimeout(() => setClosingSplash(true), 1700);
-    const removeTimer = window.setTimeout(() => setShowSplash(false), 2000);
+    const closeTimer = window.setTimeout(() => setClosingSplash(true), 4700);
+    const removeTimer = window.setTimeout(() => setShowSplash(false), 5000);
 
     return () => {
       window.clearTimeout(closeTimer);
