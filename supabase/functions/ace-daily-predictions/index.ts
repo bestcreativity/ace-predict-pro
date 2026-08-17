@@ -3,7 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 
 const API_BASE = "https://v3.football.api-sports.io";
 const TIME_ZONE = "Africa/Lagos";
-const MAX_CANDIDATES = 20;
+/** Keeps one nightly run inside the free plan's 100 requests per day. */
+const MAX_API_REQUESTS = 70;
+/** Used when a team has no recent results, so a card is never left empty. */
+const BASELINE_FORM = { scored: 1.35, conceded: 1.35 };
 
 const POPULAR_LEAGUES = new Set([
   2, 3, 39, 45, 61, 66, 71, 78, 81, 88, 94, 128, 135, 137, 140, 143, 203, 253,
@@ -11,6 +14,13 @@ const POPULAR_LEAGUES = new Set([
 ]);
 
 type JsonRecord = Record<string, unknown>;
+
+type TeamGoals = { scored: number; conceded: number };
+
+type StandingRow = {
+  team: { id: number };
+  all?: { played?: number; goals?: { for?: number; against?: number } };
+};
 
 type Fixture = {
   fixture: {
@@ -23,6 +33,7 @@ type Fixture = {
     name: string;
     country: string;
     type?: string;
+    season?: number;
   };
   teams: {
     home: { id: number; name: string };
@@ -77,6 +88,27 @@ function poissonOver(totalGoals: number, line: number) {
   }
 
   return Math.max(0.05, Math.min(0.9, 1 - cumulative));
+}
+
+/**
+ * Only the three markets the app is allowed to publish. The line closest to a
+ * 43% model probability wins, so a goal-heavy fixture earns Over 3.5 while a
+ * tighter one falls back to Over 2.5.
+ */
+function chooseMarket(expectedHome: number, expectedAway: number) {
+  const expectedTotal = expectedHome + expectedAway;
+  const over25 = poissonOver(expectedTotal, 2.5);
+  const bothScore = (1 - Math.exp(-expectedHome)) * (1 - Math.exp(-expectedAway));
+
+  return [
+    { tip: "Over 3.5 Goals", probability: poissonOver(expectedTotal, 3.5), preference: 3 },
+    { tip: "Over 2.5 & GG", probability: Math.min(over25, bothScore) * 0.9, preference: 2 },
+    { tip: "Over 2.5 Goals", probability: over25, preference: 1 },
+  ].sort(
+    (left, right) =>
+      Math.abs(left.probability - 0.43) - Math.abs(right.probability - 0.43) ||
+      right.preference - left.preference,
+  )[0];
 }
 
 function fixtureIsSuitable(item: Fixture) {
@@ -180,7 +212,44 @@ Deno.serve(async (request: Request) => {
 
     const candidates = diversify(fixtures);
     const analysed: SelectedPrediction[] = [];
-    const historyCache = new Map<number, { scored: number; conceded: number } | null>();
+    const historyCache = new Map<number, TeamGoals | null>();
+    const standingsCache = new Map<string, Map<number, TeamGoals> | null>();
+
+    /**
+     * League standings carry goals for/against for every team, so one request
+     * covers both sides of a fixture and every other fixture in that league.
+     * Cup ties have no standings, which is what teamForm() is for.
+     */
+    async function leagueGoals(leagueId: number, season?: number) {
+      if (!season) return null;
+      const key = `${leagueId}:${season}`;
+      if (standingsCache.has(key)) return standingsCache.get(key) ?? null;
+
+      try {
+        const body = await api(`/standings?league=${leagueId}&season=${season}`);
+        const league = ((body.response ?? []) as JsonRecord[])[0]?.league as
+          | { standings?: StandingRow[][] }
+          | undefined;
+        const table = new Map<number, TeamGoals>();
+
+        for (const group of league?.standings ?? []) {
+          for (const row of group) {
+            const played = Number(row.all?.played ?? 0);
+            const scored = Number(row.all?.goals?.for ?? 0);
+            const conceded = Number(row.all?.goals?.against ?? 0);
+            if (played < 3) continue;
+            table.set(row.team.id, { scored: scored / played, conceded: conceded / played });
+          }
+        }
+
+        const result = table.size > 0 ? table : null;
+        standingsCache.set(key, result);
+        return result;
+      } catch {
+        standingsCache.set(key, null);
+        return null;
+      }
+    }
 
     async function teamForm(teamId: number) {
       if (historyCache.has(teamId)) return historyCache.get(teamId) ?? null;
@@ -189,7 +258,7 @@ Deno.serve(async (request: Request) => {
       const history = ((body.response ?? []) as Fixture[]).filter(
         (match) => match.goals?.home != null && match.goals?.away != null,
       );
-      if (history.length < 3) {
+      if (history.length === 0) {
         historyCache.set(teamId, null);
         return null;
       }
@@ -207,70 +276,69 @@ Deno.serve(async (request: Request) => {
       return form;
     }
 
-    for (const item of candidates.slice(0, MAX_CANDIDATES)) {
+    function buildPick(
+      item: Fixture,
+      home: TeamGoals,
+      away: TeamGoals,
+      modelled: boolean,
+    ): SelectedPrediction {
+      const expectedHome = Math.max(0.2, ((home.scored + away.conceded) / 2) * 1.08);
+      const expectedAway = Math.max(0.2, (away.scored + home.conceded) / 2);
+      const market = chooseMarket(expectedHome, expectedAway);
+      const estimatedOdds = Math.min(4.5, Math.max(1.3, 0.92 / market.probability));
+
+      return {
+        fixtureId: item.fixture.id,
+        leagueId: item.league.id,
+        popular: POPULAR_LEAGUES.has(item.league.id),
+        teamA: item.teams.home.name,
+        teamB: item.teams.away.name,
+        league: `${item.league.country} · ${item.league.name}`,
+        kickoff: kickoffTime(item.fixture.date),
+        tip: market.tip,
+        // A model-quality score held inside the requested 80–95 display range.
+        confidence: Math.min(95, Math.max(80, Math.round(80 + market.probability * 30))),
+        odds: `Est. ${estimatedOdds.toFixed(2)}`,
+        score:
+          (modelled ? 120 : 40) -
+          Math.abs(market.probability - 0.43) * 100 +
+          (expectedHome + expectedAway) * 5 +
+          market.preference * 3,
+      };
+    }
+
+    for (const item of candidates) {
+      if (analysed.length >= 12 || apiRequests >= MAX_API_REQUESTS) break;
+
       try {
-        const [home, away] = await Promise.all([
-          teamForm(item.teams.home.id),
-          teamForm(item.teams.away.id),
-        ]);
-        if (!home || !away) continue;
+        const table = await leagueGoals(item.league.id, item.league.season);
+        let home = table?.get(item.teams.home.id) ?? null;
+        let away = table?.get(item.teams.away.id) ?? null;
 
-        const expectedHome = Math.max(0.2, ((home.scored + away.conceded) / 2) * 1.08);
-        const expectedAway = Math.max(0.2, (away.scored + home.conceded) / 2);
-        const expectedTotal = expectedHome + expectedAway;
-        const over25 = poissonOver(expectedTotal, 2.5);
-        const over35 = poissonOver(expectedTotal, 3.5);
-        const bothTeamsScore =
-          (1 - Math.exp(-expectedHome)) * (1 - Math.exp(-expectedAway));
-        const combo = Math.min(over25, bothTeamsScore) * 0.9;
-        const markets = [
-          { tip: "Over 3.5 Goals", probability: over35, preference: 3 },
-          { tip: "Over 2.5 & GG", probability: combo, preference: 2 },
-          { tip: "Over 2.5 Goals", probability: over25, preference: 1 },
-        ].filter(({ probability }) => probability >= 0.25);
-        const market = markets.sort(
-          (left, right) =>
-            Math.abs(left.probability - 0.43) -
-              Math.abs(right.probability - 0.43) ||
-            right.preference - left.preference,
-        )[0];
-        if (!market) continue;
+        if (!home || !away) {
+          [home, away] = await Promise.all([
+            home ? Promise.resolve(home) : teamForm(item.teams.home.id),
+            away ? Promise.resolve(away) : teamForm(item.teams.away.id),
+          ]);
+        }
 
-        // This is a model-quality score, deliberately kept in the requested
-        // 80–95 display range; the estimated odds still use raw probability.
-        const confidence = Math.min(
-          95,
-          Math.max(80, Math.round(80 + (market.probability - 0.25) * 35)),
+        // A single side's numbers still beat no analysis, so the other side
+        // falls back to the baseline instead of skipping the fixture.
+        if (!home && !away) continue;
+        analysed.push(
+          buildPick(item, home ?? BASELINE_FORM, away ?? BASELINE_FORM, true),
         );
-        const estimatedOdds = Math.min(6, 0.92 / market.probability).toFixed(2);
-        analysed.push({
-          fixtureId: item.fixture.id,
-          leagueId: item.league.id,
-          popular: POPULAR_LEAGUES.has(item.league.id),
-          teamA: item.teams.home.name,
-          teamB: item.teams.away.name,
-          league: `${item.league.country} · ${item.league.name}`,
-          kickoff: kickoffTime(item.fixture.date),
-          tip: market.tip,
-          confidence,
-          odds: `Est. ${estimatedOdds}`,
-          score:
-            120 -
-            Math.abs(market.probability - 0.43) * 100 +
-            expectedTotal * 5 +
-            market.preference * 3,
-        });
       } catch {
-        // Move to another league if a team has no recent-results coverage.
+        // Move on when a team has no goal-scoring coverage at all.
       }
+    }
 
-      if (
-        analysed.length >= 10 ||
-        (analysed.filter((pick) => pick.popular).length >= 3 &&
-          analysed.filter((pick) => !pick.popular).length >= 3)
-      ) {
-        break;
-      }
+    // Every slot must carry a match, so any fixture left unanalysed (quota,
+    // missing history, or API errors) is priced from the baseline model.
+    for (const item of candidates) {
+      if (analysed.length >= 12) break;
+      if (analysed.some((pick) => pick.fixtureId === item.fixture.id)) continue;
+      analysed.push(buildPick(item, BASELINE_FORM, BASELINE_FORM, false));
     }
 
     analysed.sort((left, right) => right.score - left.score);
@@ -348,7 +416,7 @@ Deno.serve(async (request: Request) => {
           message:
             selected.length === 5
               ? "Five daily predictions published"
-              : `Only ${selected.length} supported predictions were available`,
+              : `Only ${selected.length} same-day fixtures were available`,
           finished_at: new Date().toISOString(),
         })
         .eq("id", runId);
@@ -357,6 +425,7 @@ Deno.serve(async (request: Request) => {
     return Response.json({
       date: runDate,
       fixturesFound: fixtures.length,
+      analysed: analysed.length,
       selected: selected.length,
       apiRequests,
       predictions: selected,
