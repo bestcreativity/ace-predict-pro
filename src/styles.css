@@ -203,3 +203,109 @@
 @utility shell-bg {
   background: var(--gradient-shell);
 }
+
+.app-opening-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.35rem;
+  overflow: hidden;
+  padding: max(1.5rem, env(safe-area-inset-top)) 1.5rem
+    max(1.5rem, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 50% 42%, rgb(17 112 58 / 24%), transparent 48%),
+    #05090b;
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.app-opening-splash--closing {
+  opacity: 0;
+}
+
+.app-opening-splash__glow {
+  position: absolute;
+  width: min(88vw, 28rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgb(19 255 113 / 12%);
+  filter: blur(54px);
+  animation: app-splash-glow 1.4s ease-in-out infinite alternate;
+}
+
+.app-opening-splash__icon {
+  position: relative;
+  width: min(72vw, 21rem);
+  height: auto;
+  border-radius: 22%;
+  filter: drop-shadow(0 1.5rem 2.5rem rgb(0 0 0 / 55%));
+  animation: app-splash-icon 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-opening-splash__message {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  color: #e8c66a;
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 4.5vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 0 1.25rem rgb(232 198 106 / 35%);
+}
+
+.app-opening-splash__message span {
+  opacity: 0;
+  transform: translateY(0.8rem);
+  animation: app-splash-message 500ms ease-out forwards;
+}
+
+.app-opening-splash__message span:first-child {
+  animation-delay: 420ms;
+}
+
+.app-opening-splash__message span:last-child {
+  color: #35ef83;
+  animation-delay: 690ms;
+}
+
+@keyframes app-splash-icon {
+  from {
+    opacity: 0;
+    transform: scale(0.74) rotate(-3deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes app-splash-message {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-splash-glow {
+  to {
+    opacity: 0.65;
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-opening-splash__glow,
+  .app-opening-splash__icon,
+  .app-opening-splash__message span {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
