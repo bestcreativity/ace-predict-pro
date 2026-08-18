@@ -20,6 +20,7 @@ import {
   playAdMobRewardedAd,
   setAdMobTestMode,
 } from "@/lib/admob";
+import { WeeklyTracker } from "@/components/ace/WeeklyTracker";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -278,6 +279,8 @@ function AdminPage() {
             </Button>
           </div>
         </form>
+
+        <WeeklyTracker passcode={passcode} />
       </main>
     </div>
   );

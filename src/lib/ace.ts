@@ -135,3 +135,85 @@ export async function savePredictionSlot(
   if (error) throw error;
   return mapPrediction(data as PredictionRow);
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Game history types & API
+// ────────────────────────────────────────────────────────────────────────────
+
+export type GameResult = "pending" | "win" | "loss";
+
+export type GameHistoryEntry = {
+  id: number;
+  gameDate: string;
+  slot: number;
+  teamA: string;
+  teamB: string;
+  league: string;
+  kickoff: string;
+  odds: string;
+  tip: string;
+  confidence: number;
+  slipImage?: string;
+  result: GameResult;
+};
+
+type GameHistoryRow = {
+  id: number;
+  game_date: string;
+  slot: number;
+  team_a: string;
+  team_b: string;
+  league: string;
+  kickoff: string;
+  odds: string;
+  tip: string;
+  confidence: number;
+  slip_image: string | null;
+  result: GameResult;
+  created_at: string;
+};
+
+function mapGameHistory(row: GameHistoryRow): GameHistoryEntry {
+  return {
+    id: row.id,
+    gameDate: row.game_date,
+    slot: row.slot,
+    teamA: row.team_a,
+    teamB: row.team_b,
+    league: row.league,
+    kickoff: row.kickoff,
+    odds: row.odds,
+    tip: row.tip,
+    confidence: row.confidence,
+    ...(row.slip_image ? { slipImage: row.slip_image } : {}),
+    result: row.result,
+  };
+}
+
+/**
+ * Fetch game history for the past N days (default 7).
+ */
+export async function getGameHistory(days: number = 7): Promise<GameHistoryEntry[]> {
+  const { data, error } = await supabase.rpc("ace_get_game_history", { p_days: days });
+  if (error) throw error;
+  return ((data as GameHistoryRow[]) ?? []).map(mapGameHistory);
+}
+
+/**
+ * Admin: mark a specific game as win or loss.
+ */
+export async function setGameResult(
+  passcode: string,
+  gameDate: string,
+  slot: number,
+  result: GameResult,
+): Promise<GameHistoryEntry> {
+  const { data, error } = await supabase.rpc("ace_set_game_result", {
+    p_admin_passcode: passcode,
+    p_game_date: gameDate,
+    p_slot: slot,
+    p_result: result,
+  });
+  if (error) throw error;
+  return mapGameHistory(data as GameHistoryRow);
+}
