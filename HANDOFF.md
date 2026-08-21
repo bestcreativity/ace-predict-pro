@@ -180,6 +180,8 @@ Earlier feature (the "Weekly Game Tracker"):
 
 Git history (most recent first):
 ```
+caa4e75 feat: Today/Tomorrow tabs with 5 matches x 3 tips each (no odds/confidence)
+d631cf9 feat(ui): show app version v1.4.0 on homepage + admin headers
 dafb4bd fix: set executable permission on gradlew for CI
 5cc8237 fix: use Node 22 for Capacitor CLI
 700262c fix: use npm install instead of npm ci
