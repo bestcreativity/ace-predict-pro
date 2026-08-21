@@ -13,13 +13,7 @@ import {
   type Prediction,
   type PredictionSlotInput,
 } from "@/lib/ace";
-import {
-  canUseNativeAdMob,
-  describeAdMobError,
-  isAdMobTestMode,
-  playAdMobRewardedAd,
-  setAdMobTestMode,
-} from "@/lib/admob";
+import { canUseUnityAds, isUnityAdsConfigured } from "@/lib/unity-ads";
 import { WeeklyTracker } from "@/components/ace/WeeklyTracker";
 
 export const Route = createFileRoute("/admin")({
@@ -149,7 +143,7 @@ function AdminPage() {
       </header>
 
       <main className="mx-auto mt-5 w-full max-w-2xl space-y-4 px-3 sm:mt-6 sm:px-4">
-        <AdMobDiagnostics />
+        <UnityAdsStatus />
 
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {slots.map((slot) => (
@@ -286,69 +280,19 @@ function AdminPage() {
   );
 }
 
-function AdMobDiagnostics() {
-  const [testMode, setTestMode] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-
-  useEffect(() => {
-    setTestMode(isAdMobTestMode());
-  }, []);
-
-  const native = canUseNativeAdMob();
-
-  function toggleTestMode() {
-    const next = !testMode;
-    setAdMobTestMode(next);
-    setTestMode(next);
-  }
-
-  async function runTest() {
-    setChecking(true);
-    setResult(null);
-    try {
-      const rewarded = await playAdMobRewardedAd();
-      setResult(rewarded ? "Reward earned — AdMob is working." : "Ad closed before the reward.");
-    } catch (error) {
-      setResult(describeAdMobError(error));
-    } finally {
-      setChecking(false);
-    }
-  }
+function UnityAdsStatus() {
+  const configured = isUnityAdsConfigured();
+  const available = canUseUnityAds();
 
   return (
-    <section className="surface-card space-y-3 p-4">
-      <div>
-        <h2 className="text-sm font-semibold">AdMob Rewarded Video</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {native
-            ? "Native AdMob is available in this app build."
-            : "Native AdMob is unavailable here — open the installed app to test it."}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={toggleTestMode}>
-          {testMode ? "Using Google test ads" : "Use Google test ads"}
-        </Button>
-        <Button
-          type="button"
-          variant="hero"
-          size="sm"
-          onClick={runTest}
-          disabled={checking || !native}
-        >
-          {checking ? "Testing…" : "Play test ad"}
-        </Button>
-      </div>
-
-      {result ? (
-        <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">{result}</p>
-      ) : null}
-
-      <p className="text-[11px] text-muted-foreground">
-        Test ads always fill, so they prove the setup works. Turn them off before letting real users
-        watch, since test ads earn nothing.
+    <section className="surface-card space-y-2 p-4">
+      <h2 className="text-sm font-semibold">Unity Ads Rewarded Video</h2>
+      <p className="text-xs text-muted-foreground">
+        {!configured
+          ? "Unity Ads is not configured yet — add your Game ID in src/lib/unity-ads.ts."
+          : available
+            ? "Unity Ads is active in this app build."
+            : "Unity Ads is configured but unavailable here — open the installed app to use it."}
       </p>
     </section>
   );

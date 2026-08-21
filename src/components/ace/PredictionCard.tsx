@@ -3,10 +3,13 @@ import { CalendarClock, Clock, Lock, PlayCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { unlock, type Prediction } from "@/lib/ace";
-import { canUseNativeAdMob, describeAdMobError, playAdMobRewardedAd } from "@/lib/admob";
+import { canUseUnityAds, describeUnityError, playUnityRewardedAd } from "@/lib/unity-ads";
 import { playRewardedAd } from "@/lib/rewarded-ad";
 
 const PENDING_AD_KEY = "ace:pending-ad";
+
+// Monetag is paused. Flip to true to re-enable it as a fallback ad source.
+const MONETAG_ENABLED = false;
 
 function ConfidenceBadge({ value }: { value: number }) {
   const strong = value >= 80;
@@ -96,27 +99,35 @@ export function PredictionCard({
     setPlayingAd(true);
 
     try {
-      if (canUseNativeAdMob()) {
+      // 1. Unity Ads rewarded video (native, inside the APK).
+      if (canUseUnityAds()) {
         try {
-          if (await playAdMobRewardedAd()) {
+          if (await playUnityRewardedAd()) {
             completeUnlock();
             return;
           }
+          // The ad played but was closed before the reward was earned.
+          toast.error("Watch the full video ad to unlock this pick.");
+          return;
         } catch (error) {
-          toast.error(`Video ad unavailable: ${describeAdMobError(error)}`);
+          // Unity could not load an ad — fall through to the next source.
+          toast.error(`Unity Ads: ${describeUnityError(error)}`);
         }
       }
 
-      if (prediction.adZoneId) {
+      // 2. Monetag rewarded ad (PAUSED — set MONETAG_ENABLED to true to re-enable).
+      if (MONETAG_ENABLED && prediction.adZoneId) {
         try {
           await playRewardedAd(prediction.adZoneId);
           completeUnlock();
           return;
-        } catch {
-          /* Fall back to the direct link below. */
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Rewarded ad failed";
+          toast.error(message);
         }
       }
 
+      // 3. Direct ad link (last resort).
       openAdLink();
     } finally {
       setPlayingAd(false);

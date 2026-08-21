@@ -4,5 +4,4 @@
     <string name="title_activity_main">ACE PREDICT</string>
     <string name="package_name">com.acepredict.app</string>
     <string name="custom_url_scheme">com.acepredict.app</string>
-    <string name="admob_app_id">ca-app-pub-8152015975128016~9235174378</string>
 </resources>

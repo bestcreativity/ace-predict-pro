@@ -36,7 +36,8 @@ export function loadRewardedAd(zoneId: string): Promise<RewardedAdFn> {
       window.setTimeout(() => waitForFn(attemptsLeft - 1), 200);
     };
 
-    if (document.querySelector(`script[data-zone="${zoneId}"]`)) {
+    const existingScript = document.querySelector(`script[data-zone="${zoneId}"]`);
+    if (existingScript) {
       waitForFn(50);
       return;
     }
@@ -59,5 +60,12 @@ export function loadRewardedAd(zoneId: string): Promise<RewardedAdFn> {
 /** Resolves only once the viewer has earned the reward. */
 export async function playRewardedAd(zoneId: string): Promise<void> {
   const show = await loadRewardedAd(zoneId);
-  await show();
+
+  try {
+    await show({ type: "preload" });
+  } catch {
+    /* Preload is best-effort; the show call can still succeed. */
+  }
+
+  await show({ type: "end" });
 }

@@ -30,7 +30,7 @@ predictions and now tracks weekly win/loss performance.
 | Styling | **Tailwind CSS v4** + Radix UI + shadcn-style components |
 | Database | **Supabase** (hosted PostgreSQL) |
 | Mobile shell | **Capacitor 8** (Android APK) |
-| Ads | **AdMob** (native rewarded) + **Monetag** (web rewarded, via zone ID) |
+| Ads | **Unity Ads** (native rewarded video) + Monetag (web, currently PAUSED). AdMob removed. |
 | Build tool | Vite 8 (`vite build`, `vite.mobile.config.ts` for APK) |
 | CI/CD | **GitHub Actions** (`.github/workflows/build-apk.yml`) builds the APK |
 
@@ -57,8 +57,8 @@ ace-predict-pro-main/          ← workspace root
     │   ├── lib/
     │   │   ├── ace.ts         ← ★ core: Prediction + GameHistory types & API calls
     │   │   ├── supabase.ts    ← Supabase client
-    │   │   ├── admob.ts       ← native AdMob rewarded ads
-    │   │   └── rewarded-ad.ts ← Monetag / fallback ad logic
+    │   │   ├── unity-ads.ts   ← ★ Unity Ads rewarded (native, via Capacitor plugin)
+    │   │   └── rewarded-ad.ts ← Monetag rewarded (currently PAUSED)
     │   └── mobile.tsx         ← mobile-specific entry
     ├── supabase/migrations/   ← ★ SQL migrations (run manually on Supabase)
     ├── android/               ← Capacitor Android project
@@ -123,6 +123,30 @@ Verified: `ace_game_history` table exists, all 3 functions present, nightly cron
 > (`if not exists` / `create or replace`), so re-running is safe.
 
 **No pending database work remains.** First archived games will appear after the next 23:00 WAT clear.
+
+### ⚠️ Ad platform: Unity Ads needs its credentials
+AdMob was removed and Unity Ads wired in, but the Game ID is still a placeholder. Until it is
+filled in, the "Watch Ad" button falls back to the direct ad link. See **§7.1** below.
+
+---
+
+## 7.1 Ad Platform — Unity Ads (AdMob removed, Monetag paused)
+
+**Decision (2026-08-21):** AdMob account closed → removed AdMob entirely; paused Monetag; adopted
+**Unity Ads** for rewarded video.
+
+**How it works:**
+- Native plugin: `android/app/src/main/java/com/acepredict/app/UnityAdsPlugin.java` (initialize /
+  loadRewarded / showRewarded), registered in `MainActivity.java`.
+- SDK dependency: `com.unity3d.ads:unity-ads:4.12.5` in `android/app/build.gradle`.
+- Web wrapper: `src/lib/unity-ads.ts` → `playUnityRewardedAd()`.
+- Unlock flow in `PredictionCard.tsx`: **Unity Ads → (Monetag, paused) → direct ad link**.
+
+**⚠️ SETUP STILL REQUIRED:** put the real values in `src/lib/unity-ads.ts`:
+- `UNITY_GAME_ID` (Unity dashboard → project → Game ID) — currently `REPLACE_WITH_YOUR_UNITY_GAME_ID`
+- `UNITY_REWARDED_PLACEMENT_ID` (the Rewarded Android placement, e.g. `Rewarded_Android`)
+
+Re-enable Monetag by setting `MONETAG_ENABLED = true` in `PredictionCard.tsx`.
 
 ---
 

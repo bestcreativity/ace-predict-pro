@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(UnityAdsPlugin.class);
         super.onCreate(savedInstanceState);
         showOpeningSplash();
     }
