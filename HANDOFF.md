@@ -109,15 +109,20 @@ Unique on `(game_date, slot)`.
 
 ---
 
-## 6. ⚠️ PENDING WORK (not yet done)
+## 6. ✅ Migrations Status
 
-**The two SQL migrations for the weekly tracker have NOT been run on Supabase yet.**
-Until they are run, the Weekly Tracker will show "No game history yet."
+**Both weekly-tracker SQL migrations have been RUN on Supabase (completed 2026-08-21).**
+Verified: `ace_game_history` table exists, all 3 functions present, nightly cron job registered
+(jobid 4). The Weekly Tracker is fully live.
 
-Run them in the Supabase SQL editor
-(https://supabase.com/dashboard/project/cvpjzaiurdpdvgostjqj/sql/new), in this order:
-1. `supabase/migrations/20260818000000_add_ace_game_history.sql`
-2. `supabase/migrations/20260818001000_update_cron_archive_before_clear.sql`
+- `supabase/migrations/20260818000000_add_ace_game_history.sql` — ✅ applied
+- `supabase/migrations/20260818001000_update_cron_archive_before_clear.sql` — ✅ applied
+
+> Note: the first run "failed" only because pasting into the Supabase editor corrupted the text.
+> Re-running via Monaco `setValue()` (exact content) succeeded. Both scripts are idempotent
+> (`if not exists` / `create or replace`), so re-running is safe.
+
+**No pending database work remains.** First archived games will appear after the next 23:00 WAT clear.
 
 ---
 
