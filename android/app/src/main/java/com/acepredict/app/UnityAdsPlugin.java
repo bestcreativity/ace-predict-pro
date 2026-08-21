@@ -30,8 +30,16 @@ public class UnityAdsPlugin extends Plugin {
             return;
         }
 
+        Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("No activity available");
+            return;
+        }
+
         UnityAds.initialize(
+            activity,
             gameId,
+            testMode,
             new IUnityAdsInitializationListener() {
                 @Override
                 public void onInitializationComplete() {
@@ -45,8 +53,7 @@ public class UnityAdsPlugin extends Plugin {
                 ) {
                     call.reject("Unity Ads init failed: " + message);
                 }
-            },
-            testMode
+            }
         );
     }
 
