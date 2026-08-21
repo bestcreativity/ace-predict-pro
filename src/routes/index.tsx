@@ -9,6 +9,7 @@ import {
   getUnlocked,
   type Prediction,
 } from "@/lib/ace";
+import { APP_VERSION } from "@/lib/version";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -79,7 +80,15 @@ function Index() {
             <Send className="size-3.5" /> Join Telegram
           </a>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">We don't gamble, We invest</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We don't gamble, We invest
+          <span
+            className="ml-2 inline-flex items-center rounded-full bg-gold/10 px-2 py-0.5 align-middle text-[10px] font-bold tracking-wide text-gold ring-1 ring-gold/40"
+            title="App version"
+          >
+            v{APP_VERSION}
+          </span>
+        </p>
       </header>
 
       <main className="mx-auto mt-5 w-full max-w-2xl px-3 sm:mt-6 sm:px-4">

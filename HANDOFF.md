@@ -57,6 +57,7 @@ ace-predict-pro-main/          ← workspace root
     │   ├── lib/
     │   │   ├── ace.ts         ← ★ core: Prediction + GameHistory types & API calls
     │   │   ├── supabase.ts    ← Supabase client
+    │   │   ├── version.ts     ← ★ APP_VERSION constant (shown on-screen)
     │   │   ├── unity-ads.ts   ← ★ Unity Ads rewarded (native, via Capacitor plugin)
     │   │   └── rewarded-ad.ts ← Monetag rewarded (currently PAUSED)
     │   └── mobile.tsx         ← mobile-specific entry
@@ -223,6 +224,9 @@ npm scripts (for reference): `dev`, `build`, `build:mobile`, `android:sync`, `an
 
 ## 12. Code Conventions
 
+- **App version is visible on-screen.** `src/lib/version.ts` exports `APP_VERSION`, shown as a small
+  badge on the homepage header and admin header. Bump it on every deploy AND keep
+  `versionName` in `android/app/build.gradle` in sync. Current: **1.4.0**.
 - UI responsiveness is a priority: use **optimistic updates**, skeleton loaders, `React.memo`,
   CSS transitions (`duration-150/200`), and `active:scale-95` for tactile feedback.
 - Design tokens: gold gradient (`text-gradient-gold`, `bg-[image:var(--gradient-gold)]`),

@@ -15,6 +15,7 @@ import {
 } from "@/lib/ace";
 import { canUseUnityAds, isUnityAdsConfigured } from "@/lib/unity-ads";
 import { WeeklyTracker } from "@/components/ace/WeeklyTracker";
+import { APP_VERSION } from "@/lib/version";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -138,7 +139,12 @@ function AdminPage() {
         </Button>
         <div className="min-w-0">
           <h1 className="text-gradient-gold break-words font-display text-xl font-bold sm:text-2xl">Manage Predictions</h1>
-          <p className="text-xs text-muted-foreground">Choose and update any of the five live cards.</p>
+          <p className="text-xs text-muted-foreground">
+            Choose and update any of the five live cards.
+            <span className="ml-1.5 rounded-full bg-gold/10 px-1.5 py-0.5 text-[10px] font-bold text-gold ring-1 ring-gold/40">
+              v{APP_VERSION}
+            </span>
+          </p>
         </div>
       </header>
 
