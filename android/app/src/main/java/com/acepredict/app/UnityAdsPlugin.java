@@ -30,14 +30,7 @@ public class UnityAdsPlugin extends Plugin {
             return;
         }
 
-        Activity activity = getActivity();
-        if (activity == null) {
-            call.reject("No activity available");
-            return;
-        }
-
         UnityAds.initialize(
-            activity,
             gameId,
             new IUnityAdsInitializationListener() {
                 @Override
