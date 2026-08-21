@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   ADMIN_SESSION_KEY,
-  EMPTY_PREDICTION_SLOTS,
-  getPredictionSlots,
-  savePredictionSlot,
-  type Prediction,
-  type PredictionSlotInput,
+  getMatchesByDay,
+  saveMatch,
+  type DayMatches,
+  type Match,
+  type MatchInput,
 } from "@/lib/ace";
 import { canUseUnityAds, isUnityAdsConfigured } from "@/lib/unity-ads";
 import { WeeklyTracker } from "@/components/ace/WeeklyTracker";
@@ -21,17 +21,47 @@ export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "Manage Predictions — ACE PREDICT Admin" },
-      { name: "description", content: "Internal admin console for managing ACE PREDICT slots." },
+      { name: "description", content: "Internal admin console for managing ACE PREDICT matches." },
       { name: "robots", content: "noindex" },
     ],
   }),
   component: AdminPage,
 });
 
+type DayTab = "today" | "tomorrow";
+
+/** Always renders five cards, filling any missing slot with a Coming Soon placeholder. */
+function padMatches(matches: Match[], date: string): Match[] {
+  const filled: Match[] = [];
+  for (let slot = 1; slot <= 5; slot += 1) {
+    const existing = matches.find((match) => match.slot === slot);
+    filled.push(
+      existing ?? {
+        id: `${date}-${slot}`,
+        matchDate: date,
+        slot,
+        published: false,
+        teamA: "",
+        teamB: "",
+        league: "",
+        kickoff: "",
+        tipOver25: "",
+        tipHalfFull: "",
+        tipHighestHalf: "",
+        adZoneId: "",
+        adUrl: "",
+        updatedAt: "",
+      },
+    );
+  }
+  return filled;
+}
+
 function AdminPage() {
   const navigate = useNavigate();
   const [passcode, setPasscode] = useState("");
-  const [slots, setSlots] = useState<Prediction[]>(EMPTY_PREDICTION_SLOTS);
+  const [days, setDays] = useState<DayMatches | null>(null);
+  const [day, setDay] = useState<DayTab>("today");
   const [selectedSlot, setSelectedSlot] = useState(1);
   const [slip, setSlip] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
@@ -46,19 +76,21 @@ function AdminPage() {
     }
 
     setPasscode(storedPasscode);
-    getPredictionSlots()
-      .then((loadedSlots) => {
-        setSlots(loadedSlots);
-        setSlip(loadedSlots[0]?.slipImage);
+    getMatchesByDay()
+      .then((loaded) => {
+        setDays(loaded);
+        setSlip(padMatches(loaded.today, loaded.businessToday)[0]?.slipImage);
       })
-      .catch(() => toast.error("Could not load prediction slots"));
+      .catch(() => toast.error("Could not load matches"));
   }, [navigate]);
 
-  const selected = slots.find((slot) => slot.slot === selectedSlot) ?? EMPTY_PREDICTION_SLOTS[0]!;
+  const matchDate = day === "today" ? (days?.businessToday ?? "") : (days?.businessTomorrow ?? "");
+  const matches = padMatches(day === "today" ? (days?.today ?? []) : (days?.tomorrow ?? []), matchDate);
+  const selected = matches.find((match) => match.slot === selectedSlot) ?? matches[0]!;
 
-  function selectSlot(slot: Prediction) {
-    setSelectedSlot(slot.slot);
-    setSlip(slot.slipImage);
+  function selectMatch(match: Match) {
+    setSelectedSlot(match.slot);
+    setSlip(match.slipImage);
   }
 
   function pickImage(event: React.ChangeEvent<HTMLInputElement>) {
@@ -73,15 +105,23 @@ function AdminPage() {
     reader.readAsDataURL(file);
   }
 
-  async function persist(input: PredictionSlotInput, message: string) {
+  async function persist(input: MatchInput, message: string) {
     setSaving(true);
     try {
-      const saved = await savePredictionSlot(passcode, input);
-      setSlots((current) => current.map((slot) => (slot.slot === saved.slot ? saved : slot)));
+      const saved = await saveMatch(passcode, input);
+      setDays((current) => {
+        if (!current) return current;
+        const bucket = saved.matchDate === current.businessToday ? "today" : "tomorrow";
+        const list = current[bucket];
+        const next = list.some((match) => match.slot === saved.slot)
+          ? list.map((match) => (match.slot === saved.slot ? saved : match))
+          : [...list, saved];
+        return { ...current, [bucket]: next };
+      });
       setSlip(saved.slipImage);
       toast.success(message);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not save this slot";
+      const message = error instanceof Error ? error.message : "Could not save this match";
       toast.error(message.includes("Invalid admin passcode") ? "Admin session expired" : message);
     } finally {
       setSaving(false);
@@ -93,39 +133,41 @@ function AdminPage() {
     const form = new FormData(event.currentTarget);
     await persist(
       {
+        matchDate,
         slot: selectedSlot,
         published: true,
         teamA: String(form.get("teamA")),
         teamB: String(form.get("teamB")),
         league: String(form.get("league")),
         kickoff: String(form.get("kickoff")),
-        odds: String(form.get("odds")),
-        tip: String(form.get("tip")),
-        confidence: Number(form.get("confidence")) || 80,
+        tipOver25: String(form.get("tipOver25")),
+        tipHalfFull: String(form.get("tipHalfFull")),
+        tipHighestHalf: String(form.get("tipHighestHalf")),
         adZoneId: String(form.get("adZoneId") ?? "").trim(),
         adUrl: String(form.get("adUrl") ?? "").trim(),
         ...(slip ? { slipImage: slip } : {}),
       },
-      `Prediction ${selectedSlot} published`,
+      `Match ${selectedSlot} for ${matchDate} published`,
     );
   }
 
-  async function clearSlot() {
+  async function clearMatch() {
     await persist(
       {
+        matchDate,
         slot: selectedSlot,
         published: false,
         teamA: "",
         teamB: "",
         league: "",
         kickoff: "",
-        odds: "",
-        tip: "",
-        confidence: 80,
+        tipOver25: "",
+        tipHalfFull: "",
+        tipHighestHalf: "",
         adZoneId: "",
         adUrl: "",
       },
-      `Prediction ${selectedSlot} changed to Coming Soon`,
+      `Match ${selectedSlot} for ${matchDate} changed to Coming Soon`,
     );
   }
 
@@ -140,7 +182,7 @@ function AdminPage() {
         <div className="min-w-0">
           <h1 className="text-gradient-gold break-words font-display text-xl font-bold sm:text-2xl">Manage Predictions</h1>
           <p className="text-xs text-muted-foreground">
-            Choose and update any of the five live cards.
+            Choose a day, then update any of its five matches.
             <span className="ml-1.5 rounded-full bg-gold/10 px-1.5 py-0.5 text-[10px] font-bold text-gold ring-1 ring-gold/40">
               v{APP_VERSION}
             </span>
@@ -151,39 +193,68 @@ function AdminPage() {
       <main className="mx-auto mt-5 w-full max-w-2xl space-y-4 px-3 sm:mt-6 sm:px-4">
         <UnityAdsStatus />
 
+        <section className="flex items-center justify-between gap-3">
+          <div className="flex rounded-full bg-secondary/60 p-0.5 ring-1 ring-border/60">
+            {(["today", "tomorrow"] as const).map((option) => {
+              const label = option === "today" ? days?.businessToday : days?.businessTomorrow;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    setDay(option);
+                    setSlip(undefined);
+                  }}
+                  className={
+                    "rounded-full px-3.5 py-1 text-[11px] font-bold uppercase tracking-wide transition " +
+                    (day === option
+                      ? "bg-gold text-background shadow"
+                      : "text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {option === "today" ? "Today" : "Tomorrow"}
+                  {label ? <span className="ml-1.5 font-normal normal-case opacity-80">{label}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {slots.map((slot) => (
+          {matches.map((match) => (
             <button
-              key={slot.slot}
+              key={match.slot}
               type="button"
-              onClick={() => selectSlot(slot)}
+              onClick={() => selectMatch(match)}
               className={
                 "surface-card min-h-24 p-3 text-left transition " +
-                (selectedSlot === slot.slot ? "ring-2 ring-gold" : "hover:border-gold/40")
+                (selectedSlot === match.slot ? "ring-2 ring-gold" : "hover:border-gold/40")
               }
             >
               <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Card {slot.slot}
+                Match {match.slot}
               </span>
               <span className="mt-2 block text-xs font-semibold">
-                {slot.published ? `${slot.teamA} vs ${slot.teamB}` : "Coming Soon"}
+                {match.published ? `${match.teamA} vs ${match.teamB}` : "Coming Soon"}
               </span>
-              <span className={slot.published ? "mt-1 block text-[10px] text-neon" : "mt-1 block text-[10px] text-gold"}>
-                {slot.published ? "Published" : "Empty"}
+              <span className={match.published ? "mt-1 block text-[10px] text-neon" : "mt-1 block text-[10px] text-gold"}>
+                {match.published ? "Published" : "Empty"}
               </span>
             </button>
           ))}
         </section>
 
         <form
-          key={`${selected.slot}-${selected.updatedAt}`}
+          key={`${selected.id}-${selected.updatedAt}`}
           onSubmit={publish}
           className="surface-card min-w-0 space-y-5 p-4 sm:p-5"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground">Editing</p>
-              <h2 className="font-display text-xl font-semibold">Prediction {selectedSlot}</h2>
+              <h2 className="font-display text-xl font-semibold">
+                {day === "today" ? "Today" : "Tomorrow"} · Match {selectedSlot}
+              </h2>
             </div>
             {!selected.published ? (
               <span className="flex items-center gap-1 rounded-full bg-gold/10 px-3 py-1 text-xs text-gold">
@@ -202,16 +273,23 @@ function AdminPage() {
               placeholder="Premier League"
             />
             <Field name="kickoff" label="Match Time" defaultValue={selected.kickoff} placeholder="17:30" />
-            <Field name="odds" label="Odds" defaultValue={selected.odds} placeholder="1.80" />
-            <Field name="tip" label="Prediction" defaultValue={selected.tip} placeholder="Home Win" />
             <Field
-              name="confidence"
-              label="Confidence Level (%)"
-              defaultValue={String(selected.confidence)}
-              placeholder="85"
-              type="number"
-              min="1"
-              max="100"
+              name="tipOver25"
+              label="Tip — Over/Under 2.5"
+              defaultValue={selected.tipOver25}
+              placeholder="Over 2.5"
+            />
+            <Field
+              name="tipHalfFull"
+              label="Tip — Half/Full"
+              defaultValue={selected.tipHalfFull}
+              placeholder="Home/Home"
+            />
+            <Field
+              name="tipHighestHalf"
+              label="Tip — Highest Scoring Half"
+              defaultValue={selected.tipHighestHalf}
+              placeholder="2nd Half"
             />
           </div>
 
@@ -219,14 +297,14 @@ function AdminPage() {
             <div>
               <h3 className="text-sm font-semibold">Ad Unlock</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                A Zone ID plays a real rewarded video inside the app. A direct link only opens a
+                Unity Ads plays the rewarded video inside the app. The direct link only opens a
                 webpage, so it is used as a fallback when the video cannot load.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 name="adZoneId"
-                label="Monetag Rewarded Zone ID"
+                label="Rewarded Ad Zone ID"
                 defaultValue={selected.adZoneId}
                 placeholder="9876543"
                 inputMode="numeric"
@@ -266,14 +344,14 @@ function AdminPage() {
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Button type="submit" variant="hero" disabled={saving}>
-              <Save className="size-4" /> {saving ? "SAVING…" : "PUBLISH THIS CARD"}
+            <Button type="submit" variant="hero" disabled={saving || !matchDate}>
+              <Save className="size-4" /> {saving ? "SAVING…" : "PUBLISH THIS MATCH"}
             </Button>
             <Button
               type="button"
               variant="destructive"
-              disabled={saving || !selected.published}
-              onClick={clearSlot}
+              disabled={saving || !matchDate || !selected.published}
+              onClick={clearMatch}
             >
               <Trash2 className="size-4" /> SET TO COMING SOON
             </Button>

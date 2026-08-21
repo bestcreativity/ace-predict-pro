@@ -3,12 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Send } from "lucide-react";
 import { PredictionCard } from "@/components/ace/PredictionCard";
 import { SecretAdminGate } from "@/components/ace/SecretAdminGate";
-import {
-  EMPTY_PREDICTION_SLOTS,
-  getPredictionSlots,
-  getUnlocked,
-  type Prediction,
-} from "@/lib/ace";
+import { getMatchesByDay, getUnlocked, type DayMatches, type Match } from "@/lib/ace";
 import { APP_VERSION } from "@/lib/version";
 
 export const Route = createFileRoute("/")({
@@ -18,30 +13,60 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Premium football predictions with odds, kickoff times and confidence ratings. No sign-up required.",
+          "Premium football predictions: Over 2.5, Half/Full and Highest Scoring Half tips for today and tomorrow. No sign-up required.",
       },
       { property: "og:title", content: "ACE PREDICT — Daily Football Predictions" },
       {
         property: "og:description",
-        content: "Expert football tips with confidence ratings. Watch an ad to unlock each pick.",
+        content: "Expert football tips for today and tomorrow. Watch an ad to unlock each pick.",
       },
     ],
   }),
   component: Index,
 });
 
+type DayTab = "today" | "tomorrow";
+
+/** Always shows five cards, filling any missing slot with a Coming Soon placeholder. */
+function padMatches(matches: Match[], date: string): Match[] {
+  const filled: Match[] = [];
+  for (let slot = 1; slot <= 5; slot += 1) {
+    const existing = matches.find((match) => match.slot === slot);
+    filled.push(
+      existing ?? {
+        id: `${date}-${slot}`,
+        matchDate: date,
+        slot,
+        published: false,
+        teamA: "",
+        teamB: "",
+        league: "",
+        kickoff: "",
+        tipOver25: "",
+        tipHalfFull: "",
+        tipHighestHalf: "",
+        adZoneId: "",
+        adUrl: "",
+        updatedAt: "",
+      },
+    );
+  }
+  return filled;
+}
+
 function Index() {
   const [unlocked, setUnlocked] = useState<string[]>([]);
-  const [slots, setSlots] = useState<Prediction[]>(EMPTY_PREDICTION_SLOTS);
+  const [days, setDays] = useState<DayMatches | null>(null);
+  const [tab, setTab] = useState<DayTab>("today");
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     setUnlocked(getUnlocked());
   }, []);
 
-  const refreshSlots = useCallback(async () => {
+  const refreshMatches = useCallback(async () => {
     try {
-      setSlots(await getPredictionSlots());
+      setDays(await getMatchesByDay());
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -52,17 +77,22 @@ function Index() {
   }, []);
 
   useEffect(() => {
-    void refreshSlots();
-    const timer = window.setInterval(() => void refreshSlots(), 30_000);
+    void refreshMatches();
+    const timer = window.setInterval(() => void refreshMatches(), 30_000);
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") void refreshSlots();
+      if (document.visibilityState === "visible") void refreshMatches();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [refreshSlots]);
+  }, [refreshMatches]);
+
+  const matches =
+    tab === "today"
+      ? padMatches(days?.today ?? [], days?.businessToday ?? "")
+      : padMatches(days?.tomorrow ?? [], days?.businessTomorrow ?? "");
 
   return (
     <div className="shell-bg min-h-dvh pb-56">
@@ -97,19 +127,35 @@ function Index() {
             <h2 className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Premium Predictions
             </h2>
-            <span className="text-[11px] text-muted-foreground">5 daily slots</span>
+            <div className="flex rounded-full bg-secondary/60 p-0.5 ring-1 ring-border/60">
+              {(["today", "tomorrow"] as const).map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => setTab(day)}
+                  className={
+                    "rounded-full px-3.5 py-1 text-[11px] font-bold uppercase tracking-wide transition " +
+                    (tab === day
+                      ? "bg-gold text-background shadow"
+                      : "text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {day === "today" ? "Today" : "Tomorrow"}
+                </button>
+              ))}
+            </div>
           </div>
           {loadError ? (
             <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              Could not refresh predictions. Showing the latest available slots.
+              Could not refresh predictions. Showing the latest available matches.
             </p>
           ) : null}
           <div className="space-y-3">
-            {slots.map((prediction) => (
+            {matches.map((match) => (
               <PredictionCard
-                key={prediction.id}
-                prediction={prediction}
-                unlocked={unlocked.includes(prediction.id)}
+                key={match.id}
+                match={match}
+                unlocked={unlocked.includes(match.id)}
                 onUnlocked={handleUnlocked}
               />
             ))}

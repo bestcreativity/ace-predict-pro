@@ -5,4 +5,4 @@
  * live on the site / in the APK (the APK loads its UI from the deployed site).
  * Keep it in sync with `versionName` in android/app/build.gradle.
  */
-export const APP_VERSION = "1.4.0";
+export const APP_VERSION = "1.5.0";

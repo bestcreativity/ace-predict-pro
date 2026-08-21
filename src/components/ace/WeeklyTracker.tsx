@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  type GameHistoryEntry,
-  type GameResult,
-  getGameHistory,
-  setGameResult,
+  type MatchHistoryEntry,
+  type MatchResult,
+  getMatchHistory,
+  setMatchResult,
 } from "@/lib/ace";
 
 type WeeklyTrackerProps = {
@@ -15,7 +15,7 @@ type WeeklyTrackerProps = {
 };
 
 export function WeeklyTracker({ passcode }: WeeklyTrackerProps) {
-  const [history, setHistory] = useState<GameHistoryEntry[]>([]);
+  const [history, setHistory] = useState<MatchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
   const isMounted = useRef(true);
@@ -30,7 +30,7 @@ export function WeeklyTracker({ passcode }: WeeklyTrackerProps) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getGameHistory(7);
+      const data = await getMatchHistory(7);
       if (isMounted.current) setHistory(data);
     } catch {
       toast.error("Could not load game history");
@@ -44,8 +44,8 @@ export function WeeklyTracker({ passcode }: WeeklyTrackerProps) {
   }, [refresh]);
 
   const markResult = useCallback(
-    async (entry: GameHistoryEntry, newResult: GameResult) => {
-      const key = `${entry.gameDate}-${entry.slot}`;
+    async (entry: MatchHistoryEntry, newResult: MatchResult) => {
+      const key = `${entry.matchDate}-${entry.slot}`;
       const previous = entry.result;
 
       // Optimistic update — change UI instantly
@@ -55,7 +55,7 @@ export function WeeklyTracker({ passcode }: WeeklyTrackerProps) {
       setSavingMap((m) => ({ ...m, [key]: true }));
 
       try {
-        await setGameResult(passcode, entry.gameDate, entry.slot, newResult);
+        await setMatchResult(passcode, entry.matchDate, entry.slot, newResult);
       } catch {
         // Roll back on failure
         setHistory((prev) =>
@@ -81,11 +81,11 @@ export function WeeklyTracker({ passcode }: WeeklyTrackerProps) {
   }, [history]);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, GameHistoryEntry[]>();
+    const map = new Map<string, MatchHistoryEntry[]>();
     for (const entry of history) {
-      const list = map.get(entry.gameDate) ?? [];
+      const list = map.get(entry.matchDate) ?? [];
       list.push(entry);
-      map.set(entry.gameDate, list);
+      map.set(entry.matchDate, list);
     }
     return Array.from(map.entries()).sort(
       ([a], [b]) => new Date(b).getTime() - new Date(a).getTime(),
@@ -99,8 +99,8 @@ export function WeeklyTracker({ passcode }: WeeklyTrackerProps) {
       <section className="surface-card space-y-2 p-4">
         <h2 className="text-sm font-semibold">Weekly Tracker</h2>
         <p className="text-xs text-muted-foreground">
-          No game history yet. Archived games will appear here after the nightly
-          clear (23:00 WAT).
+          No match history yet. Archived matches will appear here after the nightly
+          rotation (23:00 WAT).
         </p>
       </section>
     );
@@ -140,9 +140,9 @@ const DayGroup = React.memo(function DayGroup({
   onMarkResult,
 }: {
   date: string;
-  entries: GameHistoryEntry[];
+  entries: MatchHistoryEntry[];
   savingMap: Record<string, boolean>;
-  onMarkResult: (entry: GameHistoryEntry, result: GameResult) => void;
+  onMarkResult: (entry: MatchHistoryEntry, result: MatchResult) => void;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -172,7 +172,7 @@ const DayGroup = React.memo(function DayGroup({
         <div className="min-w-0">
           <h3 className="text-sm font-semibold">{formatted}</h3>
           <p className="text-[11px] text-muted-foreground">
-            {entries.length} game{entries.length !== 1 ? "s" : ""}
+            {entries.length} match{entries.length !== 1 ? "es" : ""}
             {dayPending > 0 && (
               <span className="ml-1.5 text-gold">{dayPending} pending</span>
             )}
@@ -210,9 +210,9 @@ const DayGroup = React.memo(function DayGroup({
         <div className="overflow-hidden">
           <div className="space-y-1.5">
             {entries.map((entry) => {
-              const key = `${entry.gameDate}-${entry.slot}`;
+              const key = `${entry.matchDate}-${entry.slot}`;
               return (
-                <GameRow
+                <MatchRow
                   key={entry.id}
                   entry={entry}
                   saving={!!savingMap[key]}
@@ -227,16 +227,16 @@ const DayGroup = React.memo(function DayGroup({
   );
 });
 
-/* ── GameRow ─────────────────────────────────────────────────────────────── */
+/* ── MatchRow ────────────────────────────────────────────────────────────── */
 
-const GameRow = React.memo(function GameRow({
+const MatchRow = React.memo(function MatchRow({
   entry,
   saving,
   onMarkResult,
 }: {
-  entry: GameHistoryEntry;
+  entry: MatchHistoryEntry;
   saving: boolean;
-  onMarkResult: (result: GameResult) => void;
+  onMarkResult: (result: MatchResult) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/50 bg-secondary/20 px-3 py-2 transition-colors duration-150">
@@ -246,7 +246,14 @@ const GameRow = React.memo(function GameRow({
           {entry.teamA} vs {entry.teamB}
         </p>
         <p className="text-[10px] text-muted-foreground">
-          {entry.league} &middot; {entry.tip} &middot; {entry.odds}
+          {entry.league} &middot; {entry.kickoff}
+        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">
+          O/U 2.5: <span className="text-foreground/80">{entry.tipOver25}</span>
+          <span className="mx-1">&middot;</span>
+          H/F: <span className="text-foreground/80">{entry.tipHalfFull}</span>
+          <span className="mx-1">&middot;</span>
+          Top Half: <span className="text-foreground/80">{entry.tipHighestHalf}</span>
         </p>
       </div>
 
@@ -301,19 +308,19 @@ const GameRow = React.memo(function GameRow({
 
 /* ── ResultBadge ─────────────────────────────────────────────────────────── */
 
-const resultStyles: Record<GameResult, string> = {
+const resultStyles: Record<MatchResult, string> = {
   win: "bg-neon/10 text-neon",
   loss: "bg-destructive/10 text-destructive",
   pending: "bg-gold/10 text-gold",
 };
 
-const resultIcons: Record<GameResult, React.ReactNode> = {
+const resultIcons: Record<MatchResult, React.ReactNode> = {
   win: <CheckCircle2 className="size-3" />,
   loss: <XCircle className="size-3" />,
   pending: <Clock className="size-3" />,
 };
 
-function ResultBadge({ result }: { result: GameResult }) {
+function ResultBadge({ result }: { result: MatchResult }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all duration-200 ${resultStyles[result]}`}

@@ -12,10 +12,11 @@
 
 ## 1. What This App Is
 
-**ACE PREDICT** is a premium football (soccer) predictions app. It shows **5 daily prediction
-slots** (match tips with odds, kickoff time, and confidence rating). Users unlock each prediction
-by watching a rewarded ad. There is a hidden **admin dashboard** where the owner publishes
-predictions and now tracks weekly win/loss performance.
+**ACE PREDICT** is a premium football (soccer) predictions app. It shows **5 matches per day**,
+each with **3 tips** (Over/Under 2.5, Half/Full, Highest Scoring Half) — **no odds, no confidence**.
+Users switch between **Today** and **Tomorrow** tabs and unlock each match by watching a rewarded
+ad. There is a hidden **admin dashboard** where the owner publishes/overrides matches and tracks
+weekly win/loss performance (one result per match).
 
 **Tagline:** "We don't gamble, We invest"
 **Telegram:** https://t.me/dacechannel
@@ -46,16 +47,16 @@ ace-predict-pro-main/          ← workspace root
 └── ace-predict-pro/           ← ★ ACTIVE PROJECT (Supabase version)
     ├── src/
     │   ├── routes/
-    │   │   ├── index.tsx      ← public homepage, shows 5 prediction cards
-    │   │   └── admin.tsx      ← admin dashboard (passcode-protected)
+    │   │   ├── index.tsx      ← public homepage: Today/Tomorrow tabs, 5 match cards each
+    │   │   └── admin.tsx      ← admin dashboard (passcode-protected), date-based editor
     │   ├── components/
     │   │   ├── ace/
-    │   │   │   ├── PredictionCard.tsx      ← single prediction card w/ ad unlock
+    │   │   │   ├── PredictionCard.tsx      ← match card w/ 3 tips + ad unlock
     │   │   │   ├── SecretAdminGate.tsx     ← hidden admin entry (12 taps)
-    │   │   │   └── WeeklyTracker.tsx       ← ★ NEW: weekly win/loss tracker
+    │   │   │   └── WeeklyTracker.tsx       ← weekly win/loss tracker (per match)
     │   │   └── ui/            ← shadcn-style components (button, badge, etc.)
     │   ├── lib/
-    │   │   ├── ace.ts         ← ★ core: Prediction + GameHistory types & API calls
+    │   │   ├── ace.ts         ← ★ core: Match + MatchHistory types & API calls
     │   │   ├── supabase.ts    ← Supabase client
     │   │   ├── version.ts     ← ★ APP_VERSION constant (shown on-screen)
     │   │   ├── unity-ads.ts   ← ★ Unity Ads rewarded (native, via Capacitor plugin)
@@ -71,39 +72,48 @@ ace-predict-pro-main/          ← workspace root
 
 ---
 
-## 4. How the Daily Prediction Flow Works
+## 4. How the Daily Prediction Flow Works (Today / Tomorrow rotation)
 
-1. **Midnight (00:00 WAT / 23:00 UTC):** a Supabase cron job (`ace-daily-predictions`) calls an
-   Edge Function that auto-generates 5 predictions from the API-Football API and fills the slots.
-2. Users see the 5 predictions on the homepage and unlock them by watching ads.
-3. **23:00 WAT (22:00 UTC):** a second cron job (`ace-clear-daily-predictions`):
-   - **First** archives the day's published predictions into `ace_game_history`
-     (via `ace_archive_game_history()`) with `result = 'pending'`
-   - **Then** clears all 5 slots back to "Coming Soon"
-4. The admin reviews archived games in the Weekly Tracker and marks each as **win** or **loss**.
+**Business-day rule (core concept):** the active "today" advances at **23:00 WAT**, not midnight:
+`business_today = (lagos_hour < 23) ? lagos_date : lagos_date + 1`. The Today tab shows matches
+with `match_date = business_today`; the Tomorrow tab shows `business_today + 1`.
+
+1. **23:00 WAT (22:00 UTC):** a single cron job (`ace-rotate-predictions`):
+   - Archives that day's published matches into `ace_game_history` (`ace_archive_day(date)`,
+     `result = 'pending'`) and deletes them from `ace_matches`.
+   - Calls the Edge Function with `{ date: today + 2 }` to generate the **new tomorrow**
+     (tomorrow's 5 matches already exist from the previous night — so "tomorrow becomes today"
+     happens instantly at 23:00).
+2. The Edge Function (`ace-daily-predictions`) accepts `{ date }` (defaults to tomorrow), fetches
+   that day's fixtures from API-Football, and emits 3 tips per match:
+   - **Over 2.5:** Poisson over/under on expected total goals.
+   - **Half/Full:** ~45% of expected goals in 1st half → most probable HT/FT pair ("Home/Home").
+   - **Highest Scoring Half:** compares expected 1H vs 2H goals ("1st Half"/"2nd Half"/"Both Equal").
+3. Users browse both tabs and unlock matches by watching ads.
+4. The admin reviews archived matches in the Weekly Tracker and marks each as **win** or **loss**.
 
 ---
 
 ## 5. Database Schema (Supabase)
 
-### Table: `ace_prediction_slots` (the 5 live slots)
-`slot` (1-5 PK), `published`, `team_a`, `team_b`, `league`, `kickoff`, `odds`, `tip`,
-`confidence`, `ad_url`, `ad_zone_id`, `slip_image`, `updated_at`, `source`, `source_fixture_id`,
-`source_date`, `generated_at`
+### Table: `ace_matches` (live matches, replaces `ace_prediction_slots`)
+`id`, `match_date`, `slot` (1-5), `published`, `team_a`, `team_b`, `league`, `kickoff`,
+`tip_over25`, `tip_halffull`, `tip_highest_half`, `slip_image`, `ad_zone_id`, `ad_url`,
+`source`, `source_fixture_id`, `generated_at`, `updated_at`. Unique on `(match_date, slot)`.
 
-### Table: `ace_game_history` (★ NEW — weekly tracking)
-`id`, `game_date`, `slot`, `team_a`, `team_b`, `league`, `kickoff`, `odds`, `tip`, `confidence`,
-`slip_image`, `result` (`pending`/`win`/`loss`), `created_at`.
-Unique on `(game_date, slot)`.
+### Table: `ace_game_history` (weekly tracking, one result per match)
+`id`, `match_date`, `slot`, `team_a`, `team_b`, `league`, `kickoff`, `tip_over25`, `tip_halffull`,
+`tip_highest_half`, `result` (`pending`/`win`/`loss`), `created_at`. Unique on `(match_date, slot)`.
 
 ### Key RPC functions (called from frontend via `supabase.rpc()`)
 | Function | Purpose |
 |----------|---------|
 | `verify_ace_admin_passcode(passcode)` | Checks SHA-256 hash of admin passcode |
-| `manage_ace_prediction_slot(...)` | Upserts a slot (requires passcode) |
-| `ace_get_game_history(days)` | Returns last N days of archived games |
-| `ace_set_game_result(passcode, date, slot, result)` | Marks a game win/loss/pending |
-| `ace_archive_game_history()` | Called by cron to archive before clearing |
+| `get_ace_matches_by_day()` | Returns `{ businessToday, businessTomorrow, today[], tomorrow[] }` |
+| `manage_ace_match(...)` | Upserts a match for (date, slot) (requires passcode) |
+| `ace_get_match_history(days)` | Returns last N days of archived matches |
+| `ace_set_match_result(passcode, date, slot, result)` | Marks a match win/loss/pending |
+| `ace_archive_day(date)` | service_role: archives a day into history, then deletes it |
 
 **Admin passcode** is verified by comparing SHA-256 against this stored hash (in the SQL):
 `d6185f398d70f2956adbe828e6a703c7b113129c575819f99d412e1176b74619`
@@ -112,18 +122,19 @@ Unique on `(game_date, slot)`.
 
 ## 6. ✅ Migrations Status
 
-**Both weekly-tracker SQL migrations have been RUN on Supabase (completed 2026-08-21).**
-Verified: `ace_game_history` table exists, all 3 functions present, nightly cron job registered
-(jobid 4). The Weekly Tracker is fully live.
+Old migrations (superseded by the Today/Tomorrow restructure — kept for history):
+- `20260818000000_add_ace_game_history.sql` — ✅ applied
+- `20260818001000_update_cron_archive_before_clear.sql` — ✅ applied
 
-- `supabase/migrations/20260818000000_add_ace_game_history.sql` — ✅ applied
-- `supabase/migrations/20260818001000_update_cron_archive_before_clear.sql` — ✅ applied
+**★ Current:** `supabase/migrations/20260821000000_today_tomorrow_matches.sql`
+— creates `ace_matches`, recreates `ace_game_history`, drops `ace_prediction_slots` + old
+functions, adds the new RPC functions and the `ace-rotate-predictions` cron (22:00 UTC).
 
-> Note: the first run "failed" only because pasting into the Supabase editor corrupted the text.
-> Re-running via Monaco `setValue()` (exact content) succeeded. Both scripts are idempotent
-> (`if not exists` / `create or replace`), so re-running is safe.
-
-**No pending database work remains.** First archived games will appear after the next 23:00 WAT clear.
+**⚠️ Manual steps after each deploy (not yet done):**
+1. Run `20260821000000_today_tomorrow_matches.sql` in the Supabase SQL editor.
+2. Deploy the updated Edge Function: `supabase functions deploy ace-daily-predictions`.
+3. Seed both days: call the Edge Function twice with `{ "date": "<today>" }` and
+   `{ "date": "<tomorrow>" }` so both tabs are populated on day one.
 
 ### Ad platform: Unity Ads configured
 AdMob was removed and Unity Ads wired in with live credentials (Game ID `800360344`). See **§7.1**.
@@ -150,15 +161,22 @@ Re-enable Monetag by setting `MONETAG_ENABLED = true` in `PredictionCard.tsx`.
 
 ---
 
-## 7. Recent Work Completed (the "Weekly Game Tracker" feature)
+## 7. Recent Work Completed (the "Today / Tomorrow 3-Tip" restructure)
 
-The last major feature added lets the admin track weekly wins/losses. Files touched:
-- `supabase/migrations/20260818000000_add_ace_game_history.sql` — new table + functions
-- `supabase/migrations/20260818001000_update_cron_archive_before_clear.sql` — cron archives first
-- `src/lib/ace.ts` — added `GameResult`, `GameHistoryEntry` types + `getGameHistory()` / `setGameResult()`
-- `src/components/ace/WeeklyTracker.tsx` — NEW component (optimistic updates, collapsible day groups)
-- `src/routes/admin.tsx` — renders `<WeeklyTracker passcode={passcode} />`
-- `.github/workflows/build-apk.yml` — NEW CI workflow to build the APK
+Replaced the old "5 single-tip slots" with a date-based model: 5 matches per day × 3 tips,
+Today/Tomorrow tabs, 23:00 WAT rotation, odds/confidence removed everywhere. Files touched:
+- `supabase/migrations/20260821000000_today_tomorrow_matches.sql` — new tables, functions, cron
+- `supabase/functions/ace-daily-predictions/index.ts` — accepts `{ date }`, emits 3 tips per match
+- `src/lib/ace.ts` — `Match`/`DayMatches`/`MatchHistoryEntry` types + `getMatchesByDay()`,
+  `saveMatch()`, `getMatchHistory()`, `setMatchResult()`
+- `src/routes/index.tsx` — Today/Tomorrow tabs, 30s refresh kept
+- `src/components/ace/PredictionCard.tsx` — 3 labeled tips, no odds/confidence
+- `src/routes/admin.tsx` — day selector + 5 match cards, 3-tip form
+- `src/components/ace/WeeklyTracker.tsx` — one result per match, shows all 3 tips
+
+Earlier feature (the "Weekly Game Tracker"):
+- `src/lib/ace.ts`, `src/components/ace/WeeklyTracker.tsx`, `src/routes/admin.tsx`,
+  `.github/workflows/build-apk.yml` — CI workflow to build the APK
 
 Git history (most recent first):
 ```
@@ -218,7 +236,7 @@ npm scripts (for reference): `dev`, `build`, `build:mobile`, `android:sync`, `an
 
 - Hidden entry: tap a secret area **12 times** on the homepage (`SecretAdminGate.tsx`).
 - Enter the admin passcode → verified server-side → session stored → `/admin` route unlocks.
-- The admin page manages the 5 slots AND shows the Weekly Tracker at the bottom.
+- The admin page manages Today's and Tomorrow's 5 matches AND shows the Weekly Tracker at the bottom.
 
 ---
 
@@ -226,7 +244,7 @@ npm scripts (for reference): `dev`, `build`, `build:mobile`, `android:sync`, `an
 
 - **App version is visible on-screen.** `src/lib/version.ts` exports `APP_VERSION`, shown as a small
   badge on the homepage header and admin header. Bump it on every deploy AND keep
-  `versionName` in `android/app/build.gradle` in sync. Current: **1.4.0**.
+  `versionName` in `android/app/build.gradle` in sync. Current: **1.5.0** (versionCode 6).
 - UI responsiveness is a priority: use **optimistic updates**, skeleton loaders, `React.memo`,
   CSS transitions (`duration-150/200`), and `active:scale-95` for tactile feedback.
 - Design tokens: gold gradient (`text-gradient-gold`, `bg-[image:var(--gradient-gold)]`),
