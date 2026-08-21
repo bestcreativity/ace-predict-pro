@@ -124,9 +124,8 @@ Verified: `ace_game_history` table exists, all 3 functions present, nightly cron
 
 **No pending database work remains.** First archived games will appear after the next 23:00 WAT clear.
 
-### ⚠️ Ad platform: Unity Ads needs its credentials
-AdMob was removed and Unity Ads wired in, but the Game ID is still a placeholder. Until it is
-filled in, the "Watch Ad" button falls back to the direct ad link. See **§7.1** below.
+### Ad platform: Unity Ads configured
+AdMob was removed and Unity Ads wired in with live credentials (Game ID `800360344`). See **§7.1**.
 
 ---
 
@@ -142,9 +141,9 @@ filled in, the "Watch Ad" button falls back to the direct ad link. See **§7.1**
 - Web wrapper: `src/lib/unity-ads.ts` → `playUnityRewardedAd()`.
 - Unlock flow in `PredictionCard.tsx`: **Unity Ads → (Monetag, paused) → direct ad link**.
 
-**⚠️ SETUP STILL REQUIRED:** put the real values in `src/lib/unity-ads.ts`:
-- `UNITY_GAME_ID` (Unity dashboard → project → Game ID) — currently `REPLACE_WITH_YOUR_UNITY_GAME_ID`
-- `UNITY_REWARDED_PLACEMENT_ID` (the Rewarded Android placement, e.g. `Rewarded_Android`)
+**✅ CONFIGURED (2026-08-21):** `src/lib/unity-ads.ts` has the live credentials:
+- `UNITY_GAME_ID = "800360344"`
+- `UNITY_REWARDED_PLACEMENT_ID = "Rewarded_Android"`
 
 Re-enable Monetag by setting `MONETAG_ENABLED = true` in `PredictionCard.tsx`.
 

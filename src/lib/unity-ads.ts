@@ -7,7 +7,7 @@ import { registerPlugin, Capacitor } from "@capacitor/core";
  *   2. Placement ID:   the Rewarded placement you created for Android
  * ─────────────────────────────────────────────────────────────────────────────
  */
-const UNITY_GAME_ID = "REPLACE_WITH_YOUR_UNITY_GAME_ID";
+const UNITY_GAME_ID = "800360344";
 const UNITY_REWARDED_PLACEMENT_ID = "Rewarded_Android";
 
 interface UnityAdsPlugin {
