@@ -3,6 +3,11 @@
 > **Purpose:** This document lets a new AI assistant (or developer) understand the entire project
 > quickly and continue work without losing context. Read this first before making any changes.
 
+> **⚠️ MAINTENANCE RULE (important):** After making ANY change to this project (feature, bugfix,
+> migration, config, or CI change), you MUST update this HANDOFF.md to reflect it — refresh the
+> relevant sections and the git history in §7 — then commit & push it together with the code.
+> This file is the single source of truth across chat sessions; keep it current.
+
 ---
 
 ## 1. What This App Is
