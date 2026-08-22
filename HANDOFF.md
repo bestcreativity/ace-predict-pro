@@ -130,11 +130,16 @@ Old migrations (superseded by the Today/Tomorrow restructure — kept for histor
 — creates `ace_matches`, recreates `ace_game_history`, drops `ace_prediction_slots` + old
 functions, adds the new RPC functions and the `ace-rotate-predictions` cron (22:00 UTC).
 
-**⚠️ Manual steps after each deploy (not yet done):**
-1. Run `20260821000000_today_tomorrow_matches.sql` in the Supabase SQL editor.
-2. Deploy the updated Edge Function: `supabase functions deploy ace-daily-predictions`.
-3. Seed both days: call the Edge Function twice with `{ "date": "<today>" }` and
-   `{ "date": "<tomorrow>" }` so both tabs are populated on day one.
+**✅ ALL MANUAL SETUP COMPLETED (2026-08-22):**
+1. Migration run in the Supabase SQL editor — new tables/functions created, rotation cron
+   registered (jobid 5).
+2. Edge Function re-deployed via the dashboard editor (updated timestamp confirmed live).
+3. Both days seeded by calling the function with `{ "date": "2026-08-22" }` and
+   `{ "date": "2026-08-23" }` (via `net.http_post` from SQL, cron secret pulled from vault).
+   Verified: 5 published matches for each date in `ace_matches`.
+
+**No pending database work remains.** From tonight at 23:00 WAT, the cron handles everything:
+archive today → generate today+2.
 
 ### Ad platform: Unity Ads configured
 AdMob was removed and Unity Ads wired in with live credentials (Game ID `800360344`). See **§7.1**.
