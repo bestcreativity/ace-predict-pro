@@ -188,6 +188,8 @@ Earlier feature (the "Weekly Game Tracker"):
 
 Git history (most recent first):
 ```
+7ffd573 feat(branding): rename app to 5 ACE PREDICT
+8ecd638 docs: mark Today/Tomorrow migration, function deploy and seeding complete
 caa4e75 feat: Today/Tomorrow tabs with 5 matches x 3 tips each (no odds/confidence)
 d631cf9 feat(ui): show app version v1.4.0 on homepage + admin headers
 dafb4bd fix: set executable permission on gradlew for CI

@@ -38,3 +38,4 @@ keystore.properties
 *.njsproj
 *.sln
 *.sw?
+supabase/.temp/
