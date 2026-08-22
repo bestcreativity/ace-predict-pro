@@ -151,12 +151,13 @@ functions, adds the new RPC functions and the `ace-rotate-predictions` cron (22:
    `{ "date": "2026-08-23" }` (via `net.http_post` from SQL, cron secret pulled from vault).
    Verified: 5 published matches for each date in `ace_matches`.
 
-**★ NEW PENDING (2026-08-22):** `supabase/migrations/20260822000000_two_tips_and_install_tracking.sql`
-— drops the `tip_halffull` column, recreates `manage_ace_match` (without HT/FT) and
-`ace_archive_day`, and adds `ace_device_installs` + `ace_register_device` + `ace_get_install_stats`.
-**Run it in the SQL editor, then redeploy the edge function** (the new code no longer writes
-`tip_halffull` — deploying the function BEFORE running the migration will break generation).
-Existing rows keep their old tips until archived; no reseeding required.
+**✅ APPLIED (2026-08-22):** `supabase/migrations/20260822000000_two_tips_and_install_tracking.sql`
+— dropped the `tip_halffull` column, recreated `manage_ace_match` (without HT/FT) and
+`ace_archive_day`, and added `ace_device_installs` + `ace_register_device` + `ace_get_install_stats`.
+The edge function was redeployed immediately afterwards (no `tip_halffull` references).
+
+**No pending database work remains.** From 23:00 WAT the cron handles everything:
+archive today → generate today+2.
 
 ### Ad platform: Monetag banner only
 All rewarded/video ads (AdMob, Unity Ads, Monetag rewarded) are REMOVED — predictions are
@@ -188,7 +189,7 @@ with the unlock button (`unity-ads.ts` and `rewarded-ad.ts` deleted).
 - Removed the ad-unlock flow: predictions show directly (`PredictionCard` simplified; unlock
   state/helpers removed from `ace.ts` and `index.tsx`).
 - Dropped the Half/Full tip everywhere → 2 tips per match. Migration
-  `20260822000000_two_tips_and_install_tracking.sql` (PENDING), edge function updated.
+  `20260822000000_two_tips_and_install_tracking.sql` (APPLIED), edge function redeployed.
 - Install tracking: `ace_device_installs` table + `ace_register_device` / `ace_get_install_stats`
   RPCs; `registerDevice()` called from `__root.tsx` on every open; admin gets an
   `InstallStatsPanel` (total installs, active today/7d, inactive-uninstall proxy).
@@ -205,6 +206,7 @@ with the unlock button (`unity-ads.ts` and `rewarded-ad.ts` deleted).
 
 Git history (most recent first):
 ```
+0271ea3 feat: free predictions (no ad unlock), 2 tips per match, install tracking
 7ffd573 feat(branding): rename app to 5 ACE PREDICT
 8ecd638 docs: mark Today/Tomorrow migration, function deploy and seeding complete
 caa4e75 feat: Today/Tomorrow tabs with 5 matches x 3 tips each (no odds/confidence)
