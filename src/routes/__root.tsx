@@ -78,10 +78,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ACE PREDICT" },
+      { title: "5 ACE PREDICT" },
       { name: "description", content: "Premium daily football predictions and VIP picks." },
-      { name: "author", content: "ACE PREDICT" },
-      { property: "og:title", content: "ACE PREDICT" },
+      { name: "author", content: "5 ACE PREDICT" },
+      { property: "og:title", content: "5 ACE PREDICT" },
       { property: "og:description", content: "Premium daily football predictions and VIP picks." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

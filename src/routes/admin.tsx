@@ -20,8 +20,8 @@ import { APP_VERSION } from "@/lib/version";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Manage Predictions — ACE PREDICT Admin" },
-      { name: "description", content: "Internal admin console for managing ACE PREDICT matches." },
+      { title: "Manage Predictions — 5 ACE PREDICT Admin" },
+      { name: "description", content: "Internal admin console for managing 5 ACE PREDICT matches." },
       { name: "robots", content: "noindex" },
     ],
   }),

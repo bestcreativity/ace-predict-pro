@@ -9,13 +9,13 @@ import { APP_VERSION } from "@/lib/version";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ACE PREDICT — Premium Football Predictions" },
+      { title: "5 ACE PREDICT — Premium Football Predictions" },
       {
         name: "description",
         content:
           "Premium football predictions: Over 2.5, Half/Full and Highest Scoring Half tips for today and tomorrow. No sign-up required.",
       },
-      { property: "og:title", content: "ACE PREDICT — Daily Football Predictions" },
+      { property: "og:title", content: "5 ACE PREDICT — Daily Football Predictions" },
       {
         property: "og:description",
         content: "Expert football tips for today and tomorrow. Watch an ad to unlock each pick.",
@@ -99,7 +99,7 @@ function Index() {
       <header className="mx-auto w-full max-w-2xl px-3 pt-6 sm:px-4 sm:pt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-gradient-gold min-w-0 font-display text-[clamp(1.65rem,8vw,2rem)] font-bold tracking-tight">
-            ACE PREDICT
+            5 ACE PREDICT
           </h1>
           <a
             href="https://t.me/dacechannel"

@@ -1,4 +1,4 @@
-# ACE PREDICT — Project Handoff Guide
+# 5 ACE PREDICT — Project Handoff Guide
 
 > **Purpose:** This document lets a new AI assistant (or developer) understand the entire project
 > quickly and continue work without losing context. Read this first before making any changes.
@@ -12,11 +12,14 @@
 
 ## 1. What This App Is
 
-**ACE PREDICT** is a premium football (soccer) predictions app. It shows **5 matches per day**,
+**5 ACE PREDICT** is a premium football (soccer) predictions app. It shows **5 matches per day**,
 each with **3 tips** (Over/Under 2.5, Half/Full, Highest Scoring Half) — **no odds, no confidence**.
 Users switch between **Today** and **Tomorrow** tabs and unlock each match by watching a rewarded
 ad. There is a hidden **admin dashboard** where the owner publishes/overrides matches and tracks
 weekly win/loss performance (one result per match).
+
+> Renamed from "ACE PREDICT" to **"5 ACE PREDICT"** on 2026-08-22 (all UI, HTML titles,
+> Android launcher label, Capacitor appName). Package ID stays `com.acepredict.app`.
 
 **Tagline:** "We don't gamble, We invest"
 **Telegram:** https://t.me/dacechannel
@@ -251,7 +254,7 @@ npm scripts (for reference): `dev`, `build`, `build:mobile`, `android:sync`, `an
 
 - **App version is visible on-screen.** `src/lib/version.ts` exports `APP_VERSION`, shown as a small
   badge on the homepage header and admin header. Bump it on every deploy AND keep
-  `versionName` in `android/app/build.gradle` in sync. Current: **1.5.0** (versionCode 6).
+  `versionName` in `android/app/build.gradle` in sync. Current: **1.6.0** (versionCode 7).
 - UI responsiveness is a priority: use **optimistic updates**, skeleton loaders, `React.memo`,
   CSS transitions (`duration-150/200`), and `active:scale-95` for tactile feedback.
 - Design tokens: gold gradient (`text-gradient-gold`, `bg-[image:var(--gradient-gold)]`),

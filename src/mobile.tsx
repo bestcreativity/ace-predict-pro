@@ -37,13 +37,13 @@ function MobileApp() {
         <div
           className={`app-opening-splash${closingSplash ? " app-opening-splash--closing" : ""}`}
           role="status"
-          aria-label="ACE Predict is opening"
+          aria-label="5 ACE Predict is opening"
         >
           <div className="app-opening-splash__glow" />
           <img
             className="app-opening-splash__icon"
             src="/ace-predict-launch.png"
-            alt="ACE Predict"
+            alt="5 ACE Predict"
           />
           <p className="app-opening-splash__message">
             <span>WE DONT GAMBLE,</span>
