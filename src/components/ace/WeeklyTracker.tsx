@@ -251,8 +251,6 @@ const MatchRow = React.memo(function MatchRow({
         <p className="mt-0.5 text-[10px] text-muted-foreground">
           O/U 2.5: <span className="text-foreground/80">{entry.tipOver25}</span>
           <span className="mx-1">&middot;</span>
-          H/F: <span className="text-foreground/80">{entry.tipHalfFull}</span>
-          <span className="mx-1">&middot;</span>
           Top Half: <span className="text-foreground/80">{entry.tipHighestHalf}</span>
         </p>
       </div>

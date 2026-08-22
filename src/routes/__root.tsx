@@ -11,6 +11,9 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { registerDevice } from "../lib/ace";
+import { APP_VERSION } from "../lib/version";
+import { Capacitor } from "@capacitor/core";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -122,6 +125,15 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Count installs: every open upserts this device's row (first open = install).
+  useEffect(() => {
+    void registerDevice(APP_VERSION, Capacitor.isNativePlatform() ? "android" : "web").catch(
+      () => {
+        /* Tracking must never disturb the app. */
+      },
+    );
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -13,7 +13,7 @@ import {
   type Match,
   type MatchInput,
 } from "@/lib/ace";
-import { canUseUnityAds, isUnityAdsConfigured } from "@/lib/unity-ads";
+import { InstallStatsPanel } from "@/components/ace/InstallStatsPanel";
 import { WeeklyTracker } from "@/components/ace/WeeklyTracker";
 import { APP_VERSION } from "@/lib/version";
 
@@ -46,7 +46,6 @@ function padMatches(matches: Match[], date: string): Match[] {
         league: "",
         kickoff: "",
         tipOver25: "",
-        tipHalfFull: "",
         tipHighestHalf: "",
         adZoneId: "",
         adUrl: "",
@@ -141,7 +140,6 @@ function AdminPage() {
         league: String(form.get("league")),
         kickoff: String(form.get("kickoff")),
         tipOver25: String(form.get("tipOver25")),
-        tipHalfFull: String(form.get("tipHalfFull")),
         tipHighestHalf: String(form.get("tipHighestHalf")),
         adZoneId: String(form.get("adZoneId") ?? "").trim(),
         adUrl: String(form.get("adUrl") ?? "").trim(),
@@ -162,7 +160,6 @@ function AdminPage() {
         league: "",
         kickoff: "",
         tipOver25: "",
-        tipHalfFull: "",
         tipHighestHalf: "",
         adZoneId: "",
         adUrl: "",
@@ -191,7 +188,7 @@ function AdminPage() {
       </header>
 
       <main className="mx-auto mt-5 w-full max-w-2xl space-y-4 px-3 sm:mt-6 sm:px-4">
-        <UnityAdsStatus />
+        <InstallStatsPanel passcode={passcode} />
 
         <section className="flex items-center justify-between gap-3">
           <div className="flex rounded-full bg-secondary/60 p-0.5 ring-1 ring-border/60">
@@ -280,45 +277,11 @@ function AdminPage() {
               placeholder="Over 2.5"
             />
             <Field
-              name="tipHalfFull"
-              label="Tip — Half/Full"
-              defaultValue={selected.tipHalfFull}
-              placeholder="Home/Home"
-            />
-            <Field
               name="tipHighestHalf"
               label="Tip — Highest Scoring Half"
               defaultValue={selected.tipHighestHalf}
               placeholder="2nd Half"
             />
-          </div>
-
-          <div className="space-y-4 rounded-lg border border-border/60 bg-secondary/30 p-4">
-            <div>
-              <h3 className="text-sm font-semibold">Ad Unlock</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Unity Ads plays the rewarded video inside the app. The direct link only opens a
-                webpage, so it is used as a fallback when the video cannot load.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                name="adZoneId"
-                label="Rewarded Ad Zone ID"
-                defaultValue={selected.adZoneId}
-                placeholder="9876543"
-                inputMode="numeric"
-                required={false}
-              />
-              <Field
-                name="adUrl"
-                label="Direct Ad Link (fallback)"
-                defaultValue={selected.adUrl}
-                placeholder="https://example.com/your-ad"
-                type="url"
-                required={false}
-              />
-            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -361,24 +324,6 @@ function AdminPage() {
         <WeeklyTracker passcode={passcode} />
       </main>
     </div>
-  );
-}
-
-function UnityAdsStatus() {
-  const configured = isUnityAdsConfigured();
-  const available = canUseUnityAds();
-
-  return (
-    <section className="surface-card space-y-2 p-4">
-      <h2 className="text-sm font-semibold">Unity Ads Rewarded Video</h2>
-      <p className="text-xs text-muted-foreground">
-        {!configured
-          ? "Unity Ads is not configured yet — add your Game ID in src/lib/unity-ads.ts."
-          : available
-            ? "Unity Ads is active in this app build."
-            : "Unity Ads is configured but unavailable here — open the installed app to use it."}
-      </p>
-    </section>
   );
 }
 

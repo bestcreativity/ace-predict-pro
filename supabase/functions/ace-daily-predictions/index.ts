@@ -53,7 +53,6 @@ type SelectedPrediction = {
   league: string;
   kickoff: string;
   tipOver25: string;
-  tipHalfFull: string;
   tipHighestHalf: string;
   score: number;
 };
@@ -131,16 +130,6 @@ function labelFromOutcome(outcome: { home: number; draw: number; away: number })
 /** Over/Under 2.5 goals tip. */
 function tipOver25(expectedTotal: number) {
   return poissonOver(expectedTotal, 2.5) >= 0.5 ? "Over 2.5" : "Under 2.5";
-}
-
-/** Half-Time / Full-Time tip, e.g. "Home/Home" or "Draw/Home". */
-function tipHalfFull(expectedHome: number, expectedAway: number) {
-  const ht = outcomeProbabilities(
-    expectedHome * FIRST_HALF_GOAL_SHARE,
-    expectedAway * FIRST_HALF_GOAL_SHARE,
-  );
-  const ft = outcomeProbabilities(expectedHome, expectedAway);
-  return `${labelFromOutcome(ht)}/${labelFromOutcome(ft)}`;
 }
 
 /** Which half is expected to produce more goals. */
@@ -356,7 +345,6 @@ Deno.serve(async (request: Request) => {
         league: `${item.league.country} · ${item.league.name}`,
         kickoff: kickoffTime(item.fixture.date),
         tipOver25: tipOver25(expectedTotal),
-        tipHalfFull: tipHalfFull(expectedHome, expectedAway),
         tipHighestHalf: tipHighestHalf(expectedTotal),
         score: (modelled ? 120 : 40) + expectedTotal * 5,
       };
@@ -435,7 +423,6 @@ Deno.serve(async (request: Request) => {
             league: prediction.league,
             kickoff: prediction.kickoff,
             tip_over25: prediction.tipOver25,
-            tip_halffull: prediction.tipHalfFull,
             tip_highest_half: prediction.tipHighestHalf,
             slip_image: null,
             source: "api-football",
@@ -452,7 +439,6 @@ Deno.serve(async (request: Request) => {
             league: "",
             kickoff: "",
             tip_over25: "",
-            tip_halffull: "",
             tip_highest_half: "",
             slip_image: null,
             source: "api-football",

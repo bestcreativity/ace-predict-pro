@@ -13,10 +13,11 @@
 ## 1. What This App Is
 
 **5 ACE PREDICT** is a premium football (soccer) predictions app. It shows **5 matches per day**,
-each with **3 tips** (Over/Under 2.5, Half/Full, Highest Scoring Half) — **no odds, no confidence**.
-Users switch between **Today** and **Tomorrow** tabs and unlock each match by watching a rewarded
-ad. There is a hidden **admin dashboard** where the owner publishes/overrides matches and tracks
-weekly win/loss performance (one result per match).
+each with **2 tips** (Over/Under 2.5 and Highest Scoring Half) — **no odds, no confidence**.
+Predictions are **visible immediately** (no ad unlock); revenue comes from a Monetag banner.
+Users switch between **Today** and **Tomorrow** tabs. There is a hidden **admin dashboard**
+where the owner publishes/overrides matches, tracks weekly win/loss performance (one result
+per match), and sees app install stats.
 
 > Renamed from "ACE PREDICT" to **"5 ACE PREDICT"** on 2026-08-22 (all UI, HTML titles,
 > Android launcher label, Capacitor appName). Package ID stays `com.acepredict.app`.
@@ -34,7 +35,7 @@ weekly win/loss performance (one result per match).
 | Styling | **Tailwind CSS v4** + Radix UI + shadcn-style components |
 | Database | **Supabase** (hosted PostgreSQL) |
 | Mobile shell | **Capacitor 8** (Android APK) |
-| Ads | **Unity Ads** (native rewarded video) + Monetag (web, currently PAUSED). AdMob removed. |
+| Ads | **Monetag banner** (in-page push, zone 11589662 in `index.html`). All rewarded/video ads REMOVED. |
 | Build tool | Vite 8 (`vite build`, `vite.mobile.config.ts` for APK) |
 | CI/CD | **GitHub Actions** (`.github/workflows/build-apk.yml`) builds the APK |
 
@@ -54,16 +55,16 @@ ace-predict-pro-main/          ← workspace root
     │   │   └── admin.tsx      ← admin dashboard (passcode-protected), date-based editor
     │   ├── components/
     │   │   ├── ace/
-    │   │   │   ├── PredictionCard.tsx      ← match card w/ 3 tips + ad unlock
+    │   │   │   ├── PredictionCard.tsx      ← match card w/ 2 tips (shown directly, no lock)
     │   │   │   ├── SecretAdminGate.tsx     ← hidden admin entry (12 taps)
-    │   │   │   └── WeeklyTracker.tsx       ← weekly win/loss tracker (per match)
+    │   │   │   ├── WeeklyTracker.tsx       ← weekly win/loss tracker (per match)
+    │   │   │   └── InstallStatsPanel.tsx   ← ★ install/uninstall-proxy stats for admin
     │   │   └── ui/            ← shadcn-style components (button, badge, etc.)
     │   ├── lib/
-    │   │   ├── ace.ts         ← ★ core: Match + MatchHistory types & API calls
+    │   │   ├── ace.ts         ← ★ core: Match + MatchHistory types, API calls, device tracking
     │   │   ├── supabase.ts    ← Supabase client
     │   │   ├── version.ts     ← ★ APP_VERSION constant (shown on-screen)
-    │   │   ├── unity-ads.ts   ← ★ Unity Ads rewarded (native, via Capacitor plugin)
-    │   │   └── rewarded-ad.ts ← Monetag rewarded (currently PAUSED)
+    │   │   └── ad-placement.ts← pins the Monetag banner iframe to the bottom
     │   └── mobile.tsx         ← mobile-specific entry
     ├── supabase/migrations/   ← ★ SQL migrations (run manually on Supabase)
     ├── android/               ← Capacitor Android project
@@ -88,12 +89,15 @@ with `match_date = business_today`; the Tomorrow tab shows `business_today + 1`.
      (tomorrow's 5 matches already exist from the previous night — so "tomorrow becomes today"
      happens instantly at 23:00).
 2. The Edge Function (`ace-daily-predictions`) accepts `{ date }` (defaults to tomorrow), fetches
-   that day's fixtures from API-Football, and emits 3 tips per match:
+   that day's fixtures from API-Football, and emits 2 tips per match:
    - **Over 2.5:** Poisson over/under on expected total goals.
-   - **Half/Full:** ~45% of expected goals in 1st half → most probable HT/FT pair ("Home/Home").
    - **Highest Scoring Half:** compares expected 1H vs 2H goals ("1st Half"/"2nd Half"/"Both Equal").
-3. Users browse both tabs and unlock matches by watching ads.
+3. Users browse both tabs — predictions are visible immediately, no unlock.
 4. The admin reviews archived matches in the Weekly Tracker and marks each as **win** or **loss**.
+
+**Install tracking:** every app open calls `ace_register_device` (upsert by stable device UUID
+from localStorage). The admin's Install Stats panel shows totals; a device unseen for 7+ days is
+reported as the uninstall proxy (true uninstall detection would need Firebase push).
 
 ---
 
@@ -101,12 +105,16 @@ with `match_date = business_today`; the Tomorrow tab shows `business_today + 1`.
 
 ### Table: `ace_matches` (live matches, replaces `ace_prediction_slots`)
 `id`, `match_date`, `slot` (1-5), `published`, `team_a`, `team_b`, `league`, `kickoff`,
-`tip_over25`, `tip_halffull`, `tip_highest_half`, `slip_image`, `ad_zone_id`, `ad_url`,
+`tip_over25`, `tip_highest_half`, `slip_image`, `ad_zone_id`, `ad_url`,
 `source`, `source_fixture_id`, `generated_at`, `updated_at`. Unique on `(match_date, slot)`.
 
 ### Table: `ace_game_history` (weekly tracking, one result per match)
-`id`, `match_date`, `slot`, `team_a`, `team_b`, `league`, `kickoff`, `tip_over25`, `tip_halffull`,
+`id`, `match_date`, `slot`, `team_a`, `team_b`, `league`, `kickoff`, `tip_over25`,
 `tip_highest_half`, `result` (`pending`/`win`/`loss`), `created_at`. Unique on `(match_date, slot)`.
+
+### Table: `ace_device_installs` (install tracking)
+`device_id` (PK), `first_seen`, `last_seen`, `app_version`, `platform`. Written only via
+`ace_register_device` (security definer); no direct RLS access.
 
 ### Key RPC functions (called from frontend via `supabase.rpc()`)
 | Function | Purpose |
@@ -117,6 +125,8 @@ with `match_date = business_today`; the Tomorrow tab shows `business_today + 1`.
 | `ace_get_match_history(days)` | Returns last N days of archived matches |
 | `ace_set_match_result(passcode, date, slot, result)` | Marks a match win/loss/pending |
 | `ace_archive_day(date)` | service_role: archives a day into history, then deletes it |
+| `ace_register_device(id, version, platform)` | Upserts a device row (install counting) |
+| `ace_get_install_stats(passcode)` | Admin: total installs, active today/7d, android installs |
 
 **Admin passcode** is verified by comparing SHA-256 against this stored hash (in the SQL):
 `d6185f398d70f2956adbe828e6a703c7b113129c575819f99d412e1176b74619`
@@ -133,7 +143,7 @@ Old migrations (superseded by the Today/Tomorrow restructure — kept for histor
 — creates `ace_matches`, recreates `ace_game_history`, drops `ace_prediction_slots` + old
 functions, adds the new RPC functions and the `ace-rotate-predictions` cron (22:00 UTC).
 
-**✅ ALL MANUAL SETUP COMPLETED (2026-08-22):**
+**✅ COMPLETED (2026-08-22):**
 1. Migration run in the Supabase SQL editor — new tables/functions created, rotation cron
    registered (jobid 5).
 2. Edge Function re-deployed via the dashboard editor (updated timestamp confirmed live).
@@ -141,50 +151,57 @@ functions, adds the new RPC functions and the `ace-rotate-predictions` cron (22:
    `{ "date": "2026-08-23" }` (via `net.http_post` from SQL, cron secret pulled from vault).
    Verified: 5 published matches for each date in `ace_matches`.
 
-**No pending database work remains.** From tonight at 23:00 WAT, the cron handles everything:
-archive today → generate today+2.
+**★ NEW PENDING (2026-08-22):** `supabase/migrations/20260822000000_two_tips_and_install_tracking.sql`
+— drops the `tip_halffull` column, recreates `manage_ace_match` (without HT/FT) and
+`ace_archive_day`, and adds `ace_device_installs` + `ace_register_device` + `ace_get_install_stats`.
+**Run it in the SQL editor, then redeploy the edge function** (the new code no longer writes
+`tip_halffull` — deploying the function BEFORE running the migration will break generation).
+Existing rows keep their old tips until archived; no reseeding required.
 
-### Ad platform: Unity Ads configured
-AdMob was removed and Unity Ads wired in with live credentials (Game ID `800360344`). See **§7.1**.
-
----
-
-## 7.1 Ad Platform — Unity Ads (AdMob removed, Monetag paused)
-
-**Decision (2026-08-21):** AdMob account closed → removed AdMob entirely; paused Monetag; adopted
-**Unity Ads** for rewarded video.
-
-**How it works:**
-- Native plugin: `android/app/src/main/java/com/acepredict/app/UnityAdsPlugin.java` (initialize /
-  loadRewarded / showRewarded), registered in `MainActivity.java`.
-- SDK dependency: `com.unity3d.ads:unity-ads:4.12.5` in `android/app/build.gradle`.
-- Web wrapper: `src/lib/unity-ads.ts` → `playUnityRewardedAd()`.
-- Unlock flow in `PredictionCard.tsx`: **Unity Ads → (Monetag, paused) → direct ad link**.
-
-**✅ CONFIGURED (2026-08-21):** `src/lib/unity-ads.ts` has the live credentials:
-- `UNITY_GAME_ID = "800360344"`
-- `UNITY_REWARDED_PLACEMENT_ID = "Rewarded_Android"`
-
-Re-enable Monetag by setting `MONETAG_ENABLED = true` in `PredictionCard.tsx`.
+### Ad platform: Monetag banner only
+All rewarded/video ads (AdMob, Unity Ads, Monetag rewarded) are REMOVED — predictions are
+unlocked for free. Only the Monetag banner remains. See **§7.1**.
 
 ---
 
-## 7. Recent Work Completed (the "Today / Tomorrow 3-Tip" restructure)
+## 7.1 Ad Platform — Monetag banner only (all rewarded ads removed)
 
-Replaced the old "5 single-tip slots" with a date-based model: 5 matches per day × 3 tips,
-Today/Tomorrow tabs, 23:00 WAT rotation, odds/confidence removed everywhere. Files touched:
+**Decision (2026-08-22):** the ad-unlock flow was removed entirely — predictions are visible
+immediately. AdMob was already removed (2026-08-21); Unity Ads and Monetag rewarded were removed
+with the unlock button (`unity-ads.ts` and `rewarded-ad.ts` deleted).
+
+**What remains:**
+- Monetag **in-page push banner**: script tag in `index.html` (zone `11589662`,
+  `https://nap5k.com/tag.min.js`).
+- `src/lib/ad-placement.ts` → `keepAdsBelowContent()` (called from `mobile.tsx`) pins the
+  banner iframe to the bottom so it never covers content.
+
+> Note: the native Unity Ads plugin (`UnityAdsPlugin.java` + gradle dependency) is still
+> compiled into the Android shell but is dormant — nothing calls it. Safe to strip out later
+> if APK size matters.
+
+---
+
+## 7. Recent Work Completed (latest: free predictions + install tracking)
+
+**2026-08-22 — unlock removal, 2 tips, install stats:**
+- Removed the ad-unlock flow: predictions show directly (`PredictionCard` simplified; unlock
+  state/helpers removed from `ace.ts` and `index.tsx`).
+- Dropped the Half/Full tip everywhere → 2 tips per match. Migration
+  `20260822000000_two_tips_and_install_tracking.sql` (PENDING), edge function updated.
+- Install tracking: `ace_device_installs` table + `ace_register_device` / `ace_get_install_stats`
+  RPCs; `registerDevice()` called from `__root.tsx` on every open; admin gets an
+  `InstallStatsPanel` (total installs, active today/7d, inactive-uninstall proxy).
+- Deleted `src/lib/unity-ads.ts` and `src/lib/rewarded-ad.ts`.
+
+**2026-08-22 — Today / Tomorrow 3-Tip restructure** (HT/FT since removed):
 - `supabase/migrations/20260821000000_today_tomorrow_matches.sql` — new tables, functions, cron
-- `supabase/functions/ace-daily-predictions/index.ts` — accepts `{ date }`, emits 3 tips per match
+- `supabase/functions/ace-daily-predictions/index.ts` — accepts `{ date }`, emits tips per match
 - `src/lib/ace.ts` — `Match`/`DayMatches`/`MatchHistoryEntry` types + `getMatchesByDay()`,
   `saveMatch()`, `getMatchHistory()`, `setMatchResult()`
 - `src/routes/index.tsx` — Today/Tomorrow tabs, 30s refresh kept
-- `src/components/ace/PredictionCard.tsx` — 3 labeled tips, no odds/confidence
-- `src/routes/admin.tsx` — day selector + 5 match cards, 3-tip form
-- `src/components/ace/WeeklyTracker.tsx` — one result per match, shows all 3 tips
-
-Earlier feature (the "Weekly Game Tracker"):
-- `src/lib/ace.ts`, `src/components/ace/WeeklyTracker.tsx`, `src/routes/admin.tsx`,
-  `.github/workflows/build-apk.yml` — CI workflow to build the APK
+- `src/routes/admin.tsx` — day selector + 5 match cards
+- `src/components/ace/WeeklyTracker.tsx` — one result per match
 
 Git history (most recent first):
 ```
@@ -248,7 +265,8 @@ npm scripts (for reference): `dev`, `build`, `build:mobile`, `android:sync`, `an
 
 - Hidden entry: tap a secret area **12 times** on the homepage (`SecretAdminGate.tsx`).
 - Enter the admin passcode → verified server-side → session stored → `/admin` route unlocks.
-- The admin page manages Today's and Tomorrow's 5 matches AND shows the Weekly Tracker at the bottom.
+- The admin page manages Today's and Tomorrow's 5 matches, shows the Install Stats panel and
+  the Weekly Tracker at the bottom.
 
 ---
 
@@ -256,7 +274,7 @@ npm scripts (for reference): `dev`, `build`, `build:mobile`, `android:sync`, `an
 
 - **App version is visible on-screen.** `src/lib/version.ts` exports `APP_VERSION`, shown as a small
   badge on the homepage header and admin header. Bump it on every deploy AND keep
-  `versionName` in `android/app/build.gradle` in sync. Current: **1.6.0** (versionCode 7).
+  `versionName` in `android/app/build.gradle` in sync. Current: **1.7.0** (versionCode 8).
 - UI responsiveness is a priority: use **optimistic updates**, skeleton loaders, `React.memo`,
   CSS transitions (`duration-150/200`), and `active:scale-95` for tactile feedback.
 - Design tokens: gold gradient (`text-gradient-gold`, `bg-[image:var(--gradient-gold)]`),

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Send } from "lucide-react";
 import { PredictionCard } from "@/components/ace/PredictionCard";
 import { SecretAdminGate } from "@/components/ace/SecretAdminGate";
-import { getMatchesByDay, getUnlocked, type DayMatches, type Match } from "@/lib/ace";
+import { getMatchesByDay, type DayMatches, type Match } from "@/lib/ace";
 import { APP_VERSION } from "@/lib/version";
 
 export const Route = createFileRoute("/")({
@@ -43,7 +43,6 @@ function padMatches(matches: Match[], date: string): Match[] {
         league: "",
         kickoff: "",
         tipOver25: "",
-        tipHalfFull: "",
         tipHighestHalf: "",
         adZoneId: "",
         adUrl: "",
@@ -55,14 +54,9 @@ function padMatches(matches: Match[], date: string): Match[] {
 }
 
 function Index() {
-  const [unlocked, setUnlocked] = useState<string[]>([]);
   const [days, setDays] = useState<DayMatches | null>(null);
   const [tab, setTab] = useState<DayTab>("today");
   const [loadError, setLoadError] = useState(false);
-
-  useEffect(() => {
-    setUnlocked(getUnlocked());
-  }, []);
 
   const refreshMatches = useCallback(async () => {
     try {
@@ -71,9 +65,6 @@ function Index() {
     } catch {
       setLoadError(true);
     }
-  }, []);
-  const handleUnlocked = useCallback((id: string) => {
-    setUnlocked((current) => [...new Set([...current, id])]);
   }, []);
 
   useEffect(() => {
@@ -152,12 +143,7 @@ function Index() {
           ) : null}
           <div className="space-y-3">
             {matches.map((match) => (
-              <PredictionCard
-                key={match.id}
-                match={match}
-                unlocked={unlocked.includes(match.id)}
-                onUnlocked={handleUnlocked}
-              />
+              <PredictionCard key={match.id} match={match} />
             ))}
           </div>
         </section>
